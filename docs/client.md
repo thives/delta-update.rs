@@ -1,6 +1,6 @@
 # OTA apply middleware
 
-`ota-client` is the `no_std` middleware between a payload and storage. It owns
+`delta-update-client` is the `no_std` middleware between a payload and storage. It owns
 signature gating, metadata policy, the replay of operations, the resume contract
 and the device guards. It does not own payload transport (out of project scope:
 hosts hand over complete bytes or implement `Source`), and it does not own a
@@ -78,7 +78,7 @@ it must, and keeps each write inside the range it was given.
 | `flush()` | **Persistence barrier.** On `Ok`, every write made before the call survives power loss. A sink that cannot promise that must not return `Ok`. |
 | `read_at(offset, out)` | Fills `out` from `offset`. Used by in-target copies, the pre-flight and the post-flight hashes. Only a `Readable` target can run those. |
 
-`ota_client::sink::check_range` is the one definition of the range rule. Every
+`delta_update_client::sink::check_range` is the one definition of the range rule. Every
 bundled sink calls it before touching storage.
 
 ### 2.2 `OldImage`: the read-only source of `SOURCE_COPY`
@@ -93,7 +93,7 @@ behaves as before. A plan with one is refused with `source_missing` if no image 
 given. The platform contract that makes immutability true is in
 `docs/format.md` §8.
 
-### 2.3 Bindings in `ota-cli`
+### 2.3 Bindings in `delta-update-cli`
 
 | Binding | Capacity | Durability |
 | --- | --- | --- |
@@ -170,7 +170,7 @@ pad, truncate or resize storage.
 The resume rules of §5 apply unchanged. An operation is the unit of commit, so a large
 raw operation is rewritten in full after an interruption (`docs/full-image.md` §6).
 
-## 3. Metadata policy (`ota_payload::plan`)
+## 3. Metadata policy (`delta_update_payload::plan`)
 
 `plan::validate` is the single device-independent definition of a well-formed
 plan. The generator runs the same function as a self-check, so the generator
@@ -231,7 +231,7 @@ authentication.
 | no declared signature region | any | the blob-length check governs framing |
 
 Wire-level rules are not in `plan`. They are applied before decoding, in
-`ota_payload::prescan`, and are listed in `docs/protobuf.md`.
+`delta_update_payload::prescan`, and are listed in `docs/protobuf.md`.
 
 ### 3.2 The copy check: a sorted sweep
 
@@ -400,7 +400,7 @@ for want of it. A run that resumes at `AwaitingFinal` has no operation left to r
 so it allocates no frame either. That path is not measured separately: the allocation
 follows from the check, which only looks at operations from the record's `next_op` on.
 
-The measured effect is on the unverified streamed path, `ota-client/tests/peak_completed.rs`.
+The measured effect is on the unverified streamed path, `delta-update-client/tests/peak_completed.rs`.
 There the completed re-apply's peak above its prepared state is 4,400 B (a 4,112 B chunk
 buffer and a 288 B signature buffer), where HEAD's was 8,224 B, the chunk buffer plus the
 staging frame. A verified re-apply does not show the difference. Its signature check holds the RSA
@@ -411,10 +411,10 @@ verified re-apply peaks at 16,528 B on HEAD and on this change alike.
 ## 8. API
 
 ```rust
-use ota_client::checkpoint::TargetId;
+use delta_update_client::checkpoint::TargetId;
 
 // Buffered: the complete payload in memory. prepare checks every blob.
-let prepared = ota_client::apply::prepare(payload, Trust::Verified(&keys), &EMBEDDED)?;
+let prepared = delta_update_client::apply::prepare(payload, Trust::Verified(&keys), &EMBEDDED)?;
 let g = prepared.geometry();         // optional NEW length, chunk size, operations, reach
 let name = prepared.partition_name(); // adapter policy; authenticated under Verified only
 prepared.apply_to_device(&mut dev, &mut store, &target, &progress)?;
@@ -424,7 +424,7 @@ prepared.apply_to_sink_with_image(&mut sink, &old, &mut store, &target, &progres
 
 // Streamed: prepare reads only the metadata region; apply opens the payload where
 // the checkpoint says to start.
-let prepared = ota_client::stream::prepare(src, Trust::Verified(&keys), &EMBEDDED)?;
+let prepared = delta_update_client::stream::prepare(src, Trust::Verified(&keys), &EMBEDDED)?;
 prepared.apply(open, &mut dev, &mut store, &target, &progress)?;
 prepared.apply_with_image(open, &mut dev, &old, &mut store, &target, &progress)?;
 ```
@@ -452,47 +452,47 @@ Migration from the previous API:
   in-target copy rules. Each asserts the exact code. The copy sweep (§3.2) is also checked
   against the pairwise definition on generated lists, and an extent-heavy copy at the
   embedded limit is checked across the whole lists.
-- `ota-client/tests/ranges.rs`: unaligned, short, large and out-of-order ranges;
+- `delta-update-client/tests/ranges.rs`: unaligned, short, large and out-of-order ranges;
   overlapping operations resolve to the last write; a large range costs one write
   per chunk.
-- `ota-client/tests/target_copy.rs`: an in-target copy on both pipelines, a copy
+- `delta-update-client/tests/target_copy.rs`: an in-target copy on both pipelines, a copy
   of what an earlier operation wrote; self-overlapping and cyclic copies refused at
   prepare; a write-only sink refused; a source hash mismatch refused before the
   copy's write.
-- `ota-client/tests/resume.rs`: the failure-injection suite (`docs/checkpoint.md` §7).
+- `delta-update-client/tests/resume.rs`: the failure-injection suite (`docs/checkpoint.md` §7).
   A cut during operation zero of an in-place update comes after the fresh preflight has
   passed, leaves the record `Initialized`, and resumes to the target past a modified old
   prefix. A damaged payload signature is refused on the streamed path when the resume
   reads it, over the restored hash state, and the intact payload then completes from the
   same record.
-- `ota-client/tests/model.rs`: random programs of every operation kind, built and
+- `delta-update-client/tests/model.rs`: random programs of every operation kind, built and
   applied on both pipelines, interrupted and resumed, checked against the byte-array
-  model (`ota-client/tests/support/model.rs`).
-- `ota-client/tests/frames.rs`, `sparse.rs`, `copy.rs`: each operation kind, its
+  model (`delta-update-client/tests/support/model.rs`).
+- `delta-update-client/tests/frames.rs`, `sparse.rs`, `copy.rs`: each operation kind, its
   refusals, and the reapplication of a completed update.
-- `ota-client/tests/target_scale.rs`: 16 MiB of 4 KiB chunks in six patterns, each
+- `delta-update-client/tests/target_scale.rs`: 16 MiB of 4 KiB chunks in six patterns, each
   applied through both pipelines and checked against the target. The project payload's
   operations are inspected in the same payload that is applied. An interrupted project
   payload resumes at three quarters of its blobs.
-- `ota-client/tests/regressions.rs`: hand-encoded payloads for the metadata
+- `delta-update-client/tests/regressions.rs`: hand-encoded payloads for the metadata
   policy, late rejection with zero writes, trailing bytes, and oversized signature
   declarations.
-- `ota-client/tests/full.rs`: full-image payloads from the generator, applied to
+- `delta-update-client/tests/full.rs`: full-image payloads from the generator, applied to
   zeros, erased flash and unrelated contents on both pipelines and a write-only sink,
   with no old image; an undersized device refused with zero writes; a damaged
   frame table refused before any write; a corrupt raw block refused after its writes on
   the streamed path, at its documented boundary; a cut at every write, flush and
   checkpoint resumed to the image; and a completed update that writes nothing when run
   again. The buffered refusal of a corrupt blob, verified and unverified, is in
-  `ota-client/src/apply.rs`.
-- `ota-client/tests/sizes.rs`: independent grow/shrink source and destination lengths,
+  `delta-update-client/src/apply.rs`.
+- `delta-update-client/tests/sizes.rs`: independent grow/shrink source and destination lengths,
   prefix hashes and unchanged tails, insufficient capacity, separate-image validation
   without copies, sparse-kept/untouched destination semantics, and interrupted resume.
-- `ota-client/tests/peak_memory.rs`, `peak_stream.rs`: the measured peaks stay
+- `delta-update-client/tests/peak_memory.rs`, `peak_stream.rs`: the measured peaks stay
   within their modeled bounds (`docs/memory.md`).
-- `ota-client/tests/peak_completed.rs`: a completed compressed update's re-apply peaks
+- `delta-update-client/tests/peak_completed.rs`: a completed compressed update's re-apply peaks
   at its chunk buffer and signature buffer, and allocates no staging frame (§7.1).
-- `ota-cli/tests`: the binary on a signed payload, with and without keys, on both
+- `delta-update-cli/tests`: the binary on a signed payload, with and without keys, on both
   paths; resume through the binary; the required checkpoint and target identity
   options; a device that is too small; a completed update re-applied through the
   binary; and a sparse checkpoint file under the memory limit.
@@ -527,7 +527,7 @@ flowchart TD
 
 Every refusal in the strict path happens before the first write, and before the
 checkpoint is replaced. A refused update leaves the target and the checkpoint as they
-were (`ota-client/tests/policy.rs`).
+were (`delta-update-client/tests/policy.rs`).
 
 | Policy | Requires | Success is |
 | --- | --- | --- |
@@ -541,7 +541,7 @@ every check it could make has passed. `Applied` is not an installation a host ma
 activate on the client's word.
 
 The floor is a `ReleaseFloor` the host implements, read once before the first write.
-`VolatileFloor` in `ota_client::policy` is for tests and dry runs. It is not
+`VolatileFloor` in `delta_update_client::policy` is for tests and dry runs. It is not
 rollback-resistant (`docs/platform.md` §3).
 
 ## 11. The destination contract

@@ -1,0 +1,10 @@
+[package]
+name = "delta-update-cli-args"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+edition.workspace = true
+description = "Shared std-only resource-limit arguments for the OTA host tools."
+
+[dependencies]
+clap = { workspace = true }
+delta-update-payload = { path = "../delta-update-payload" }

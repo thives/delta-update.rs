@@ -6,7 +6,7 @@ All protobuf messages in the payload (`DeltaArchiveManifest`, `InstallOperation`
 `PartitionUpdate`, `Extent`, `PartitionInfo`, `Signatures` and the nested
 `Signature`) are **generated at build time** by
 [`prost-build`](https://crates.dev/crate/prost-build) from the crate's
-**vendored** copy of the golden schema, `ota-payload/schema/update_metadata.proto`.
+**vendored** copy of the golden schema, `delta-update-payload/schema/update_metadata.proto`.
 The hand-rolled wire codec (this crate's former `proto.rs` with its
 `Sink`/`Reader` types) is deleted; field numbers, defaults, `reserved` ranges and
 the proto2 wire rules can no longer drift from the schema because they are
@@ -30,15 +30,15 @@ by the devcontainer image; `PROTOC` env var also honored).
 
 ```mermaid
 flowchart TD
-    Golden[update_engine/update_metadata.proto — golden reference, never read by our code] -.->|manual refresh + diff review| Vendored[ota-payload/schema/update_metadata.proto — vendored schema]
-    Vendored --> BuildRS[ota-payload/build.rs]
+    Golden[update_engine/update_metadata.proto — golden reference, never read by our code] -.->|manual refresh + diff review| Vendored[delta-update-payload/schema/update_metadata.proto — vendored schema]
+    Vendored --> BuildRS[delta-update-payload/build.rs]
     BuildRS -->|prost_build::compile_protos| Protoc[protoc --descriptor_set_out]
     Protoc -->|prost codegen| Gen["$OUT_DIR/chromeos_update_engine.rs — named after the proto package"]
     Gen -->|cargo:rustc-env OTA_SCHEMA_FILE| Env["OTA_SCHEMA_FILE=<abs path>"]
     Env -->|include!(env!(OTA_SCHEMA_FILE))| Schema["crate::schema — messages at top level, nested types in snake_case submodules"]
     Schema -->|pub use with short names| Manifest["crate::manifest: Manifest, Operation, PartInfo, Extent, PartitionUpdate, Signatures, Signature"]
     Manifest --> Validate["Semantic validation: decode_manifest / decode_signatures"]
-    Validate --> Consumers["ota-client, ota-generator, ota-cli build/consume messages directly"]
+    Validate --> Consumers["delta-update-client, delta-update-generator, delta-update-cli build/consume messages directly"]
 ```
 
 Two mechanical details worth recording:
@@ -56,7 +56,7 @@ Two mechanical details worth recording:
 
 ## Schema vendoring and drift policy
 
-The vendored `ota-payload/schema/update_metadata.proto` is a byte copy of
+The vendored `delta-update-payload/schema/update_metadata.proto` is a byte copy of
 the golden schema. Keeping it current is a deliberate, manual step — the
 alternative (a build script reading `../update_engine/`) would couple
 builds to the reference tree's layout and change set, which the project
@@ -64,8 +64,8 @@ rules forbid ("update_engine is only a reference"). The refresh procedure is
 documented in `build.rs` itself, next to the code it affects:
 
 ```sh
-cp update_engine/update_metadata.proto ota-payload/schema/
-git diff -- ota-payload/schema/update_metadata.proto
+cp update_engine/update_metadata.proto delta-update-payload/schema/
+git diff -- delta-update-payload/schema/update_metadata.proto
 ```
 
 Reviewing that diff is where upstream schema changes become conscious
@@ -170,18 +170,18 @@ is pulled in with `default-features = false`. This was accepted because:
 ## Validation performed
 
 - `cargo build --workspace` — clean, no warnings.
-- `cargo test --workspace` — `ota-payload` 26 unit tests (including the
+- `cargo test --workspace` — `delta-update-payload` 26 unit tests (including the
   golden wire-byte fixtures and malformed-suffix rejection suite: prost's
   decoder rejects truncated tags, field number 0, wire type 7, group tags
   without openers, oversized lengths, and field numbers ≥ 2²⁹, all mapped
-  to `bad_protobuf`) and all 5 `ota-cli` end-to-end tests (generate →
+  to `bad_protobuf`) and all 5 `delta-update-cli` end-to-end tests (generate →
   sign → verify → apply → post-flight hash) pass.
 - `rustfmt --edition 2021 --check` on the touched files.
 
 ## Bounded pre-decode scan
 
 Prost allocates while it decodes, so the decoder never sees an input whose size
-or shape has not been approved. `ota_payload::prescan` walks the wire bytes first.
+or shape has not been approved. `delta_update_payload::prescan` walks the wire bytes first.
 It allocates nothing and produces the decoded-memory `Usage` that the
 resource profile checks (see `docs/memory.md`). Only then does prost build
 the owned messages.

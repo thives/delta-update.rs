@@ -1,6 +1,6 @@
 import re, hashlib
 
-src = open('ota-payload/src/sha256.rs').read()
+src = open('delta-update-payload/src/sha256.rs').read()
 
 def grab(name):
     m = re.search(r'const %s: \[u32; \d+\] = \[(.*?)\];' % name, src, re.S)

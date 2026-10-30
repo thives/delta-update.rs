@@ -2,7 +2,7 @@
 
 A checkpoint is the record that lets an interrupted update resume at its first
 uncommitted operation. It is the only state the client keeps between runs. The
-client writes it through a host-supplied store (`ota_client::checkpoint`), and
+client writes it through a host-supplied store (`delta_update_client::checkpoint`), and
 the host must make that store atomic and durable. This document states the
 record, the phases, the rules a resume applies, and what the host must provide.
 
@@ -14,7 +14,7 @@ contract with storage), `docs/format.md` §7 (what is authenticated).
 | Question | Field | Checked against |
 | --- | --- | --- |
 | Which payload is this? | `metadata`: SHA-256 of the signed header and manifest | the digest of the metadata that `prepare` just authenticated |
-| Which target is this? | `target`: a 32-byte identity the host assigns, stable and unique per device | the identity the host passes to `apply` (`--target-id` in `ota-cli`) |
+| Which target is this? | `target`: a 32-byte identity the host assigns, stable and unique per device | the identity the host passes to `apply` (`--target-id` in `delta-update-cli`) |
 | How far has the update got? | `phase`, and `next_op`: the index of the first uncommitted operation | the operation count of the manifest |
 | Where does the payload resume? | `payload_offset`: the absolute payload offset of that operation's blob | the blob offset the manifest implies (see §3) |
 | What has the payload signature covered so far? | `hash`: the SHA-256 state over header, manifest and every committed blob byte | restored, so the prefix is never read again |
@@ -37,7 +37,7 @@ A record is a fixed 221 bytes, written as one unit.
 | 12 | 8 | `payload_offset` | big-endian `u64` |
 | 20 | 32 | metadata digest | SHA-256 of header and manifest |
 | 52 | 32 | target | host-supplied identity |
-| 84 | 105 | hash state | version byte `1`, then the 104-byte SHA-256 state (`ota_payload::sha256::snapshot`) |
+| 84 | 105 | hash state | version byte `1`, then the 104-byte SHA-256 state (`delta_update_payload::sha256::snapshot`) |
 | 189 | 32 | record digest | SHA-256 over bytes 0 to 188 |
 
 The record digest detects a torn or damaged record, so a damaged record is
@@ -141,7 +141,7 @@ store that loses a completed replacement can make the next run repeat that
 operation, but cannot make the client skip one. A store that reports success
 early can, and the host must not do that.
 
-`ota-cli` provides `FileCheckpoint`. It creates `.ota-checkpoint.stage.<digest>.<n>` in the pinned private
+`delta-update-cli` provides `FileCheckpoint`. It creates `.ota-checkpoint.stage.<digest>.<n>` in the pinned private
 `.ota-checkpoint.staging` directory inside the record's parent (§5.2). `<digest>` is 16 hexadecimal digits, the first
 eight bytes of the SHA-256 of the record being written, and `<n>` is the attempt, counted from 0. The name depends only
 on the record, so the file that produced the current record has a name the store can compute (§5.2). The file is created
@@ -192,7 +192,7 @@ it, because the store is not an input from the payload. The host must therefore:
   survives the partition it describes;
 - give each target a stable, unique `TargetId`. The client compares it, so a
   different identity for the same device refuses the resume, and one identity
-  for two devices lets a checkpoint of one be applied to the other. `ota-cli`
+  for two devices lets a checkpoint of one be applied to the other. `delta-update-cli`
   takes it as `--target-id` and derives none from a path or a device number,
   because neither identifies physical storage;
 - delete the record only when the update is complete, or when the host means to
@@ -357,8 +357,8 @@ an entry or identity lock. See `docs/locking-and-recovery.md` §10.3 and §11.
 
 **Which roles are compared, and when.** The record's directory is pinned by the store, and the record's entry is read
 through that handle with no link followed, so the entry's identity is the one the store will replace. The alias check
-(`ota-cli/src/roles.rs`) compares the identities of the open payload, device, record and old image, a block device by
-its device number and any other file by device and inode, after all of them are open (`ota-cli/src/identity.rs`). It runs
+(`delta-update-cli/src/roles.rs`) compares the identities of the open payload, device, record and old image, a block device by
+its device number and any other file by device and inode, after all of them are open (`delta-update-cli/src/identity.rs`). It runs
 before the device or old-image identity lock is attempted, and before any device write
 (`docs/locking-and-recovery.md` §9).
 
@@ -888,7 +888,7 @@ The table below covers the record's behaviour. §8 says what a host does about a
 
 ## 7. Tests
 
-`ota-client/tests/recovery.rs` injects the failures named here: a final mismatch
+`delta-update-client/tests/recovery.rs` injects the failures named here: a final mismatch
 on every later run, a retry loop, a failed `Mismatch` write, an interrupted reset, a
 reset of another target, a damaged record, and a stream whose payload signature fails.
 The unit tests in `checkpoint.rs` cover every single-byte corruption and both record
@@ -997,8 +997,8 @@ sequenceDiagram
 A base-dependent update resets only from the old image, because its kept bytes are the old
 image's, and a destination-independent update resets from any contents, because every byte it
 leaves is written again. Each refusal happens before the record is removed, and a removal that
-fails leaves the record in place for a retry. `ota-client/tests/recovery.rs` and
-`ota-cli/tests/reset.rs` test both contracts, the refusals, and a failed removal.
+fails leaves the record in place for a retry. `delta-update-client/tests/recovery.rs` and
+`delta-update-cli/tests/reset.rs` test both contracts, the refusals, and a failed removal.
 
 ### 8.2 Outcomes of a reset, and recovery from an uncertain removal
 
@@ -1044,8 +1044,8 @@ stateDiagram-v2
 
 The reset never writes the device, so none of these outcomes writes a target. The uncertain outcome is
 produced in the tests by injecting a failed directory sync after the unlink, and the test asserts both
-the reported code and that the record is absent: `ota-cli/tests/reset.rs` and
-`ota-client/tests/recovery.rs` (`a_reset_whose_removal_is_not_confirmed_durable_says_so_and_leaves_no_record`,
+the reported code and that the record is absent: `delta-update-cli/tests/reset.rs` and
+`delta-update-client/tests/recovery.rs` (`a_reset_whose_removal_is_not_confirmed_durable_says_so_and_leaves_no_record`,
 and `a_retry_that_finds_no_record_confirms_its_absence_before_it_reports_success` for the retries).
 
 ## 9. Versions and migration
@@ -1066,9 +1066,9 @@ No record-format migration is needed from version 1 to version 2; a compatible v
 version 2 on its next replacement. This does not remove the separate identity and lock migration requirements in §5.1
 and §5.2.
 
-- `ota-client/src/checkpoint.rs`: round trip, every single-byte corruption refused,
+- `delta-update-client/src/checkpoint.rs`: round trip, every single-byte corruption refused,
   wrong length and version refused, store replacement and its failure.
-- `ota-client/tests/resume.rs`: a cut at every write on both pipelines; a cut in
+- `delta-update-client/tests/resume.rs`: a cut at every write on both pipelines; a cut in
   operation zero of an in-place update, after the fresh pre-flight has passed; a failed
   flush at every barrier; a failed replacement at every record; resume during final
   verification on the streamed path, which reads only the signature message from the
@@ -1078,31 +1078,31 @@ and §5.2.
   and a stale device; a completed update re-applied on both pipelines, which
   writes nothing, refuses an altered target with `hash_mismatch`, refuses a
   damaged stream ending, and checks no target when no new hash is recorded.
-- `ota-cli/src/filecheckpoint.rs`: missing, exact, short, long and sparse record
+- `delta-update-cli/src/filecheckpoint.rs`: missing, exact, short, long and sparse record
   files; new records have no group or other permissions; a leftover staging name;
   a legacy `<path>.tmp` symlink; and a replacement whose names are all taken.
-- `ota-cli/tests/cli.rs`: a missing or malformed `--target-id` is a usage error; an
+- `delta-update-cli/tests/cli.rs`: a missing or malformed `--target-id` is a usage error; an
   interrupted stream resumes under its original identity, in either case, and is
   refused under another with no write; a sparse checkpoint of one terabyte fails
   cleanly under the memory limit; a completed update re-run writes nothing, and is
   refused once its target has changed.
-- `ota-client/tests/model.rs`: random programs, each interrupted at a random write
+- `delta-update-client/tests/model.rs`: random programs, each interrupted at a random write
   and resumed, on both pipelines, compared with the byte-array model.
-- `ota-cli/tests/e2e.rs`: a streamed run cut mid-stream, resumed with a file
+- `delta-update-cli/tests/e2e.rs`: a streamed run cut mid-stream, resumed with a file
   checkpoint and a payload reopened at the offset the record names.
-- `ota-cli/src/filecheckpoint.rs`: a symbolic link, a dangling link and a second hard link are
+- `delta-update-cli/src/filecheckpoint.rs`: a symbolic link, a dangling link and a second hard link are
   refused before any device write, and the link target is untouched.
-- `ota-cli/tests/policy.rs`: a device held by another process refuses every record name and
+- `delta-update-cli/tests/policy.rs`: a device held by another process refuses every record name and
   every hard link to it, with no record created, and a different device is not blocked. A record
   that is a symbolic link, or has a second name, is refused with no write.
-- `ota-cli/tests/reset.rs`: a completed independent reset and the next run; a base-dependent reset
+- `delta-update-cli/tests/reset.rs`: a completed independent reset and the next run; a base-dependent reset
   refused while the device holds the new image and allowed once the old image is back; another
   target or payload refused with the record kept; no record; a reset under another process's
   device lock; a failed removal that keeps the record and succeeds on retry; a damaged record kept;
   a removal whose directory sync fails, reported as `checkpoint_removal_uncertain` with the record
   absent; a retry whose sync also fails, which is uncertain again; and a later retry whose sync succeeds,
   which confirms the absence and clears nothing (§8.2).
-- `ota-cli/src/filecheckpoint.rs`: a failed directory sync after the unlink is uncertain and leaves the
+- `delta-update-cli/src/filecheckpoint.rs`: a failed directory sync after the unlink is uncertain and leaves the
   record absent; a removal that fails before the unlink is a storage error and keeps the entry; a failed
   sync when no record remains is uncertain, until a later sync confirms the absence; the checkpoint lock
   is shared through a symbolic-linked directory before the record exists; two names in one directory
@@ -1113,7 +1113,7 @@ and §5.2.
   interleavings (a staging name, a probe in flight) are refused and leave the entry untouched; a probe that
   cannot run refuses the store and releases its lock; a failed look-up after an absent load is uncertain
   and confirms nothing; the entry identity is read without following a link.
-- `ota-cli/src/filelock.rs`: a new lock file is private and a second attempt is held; a symbolic link,
+- `delta-update-cli/src/filelock.rs`: a new lock file is private and a second attempt is held; a symbolic link,
   even a dangling one, or a named pipe at the lock name is refused without a create, a write or a wait; a
   lock file with a second name is refused; a pre-existing lock file accessible to others is refused and
   left unchanged; a lock file that an access ACL grants a named group is refused; a new lock file in a
@@ -1122,17 +1122,17 @@ and §5.2.
   path is replaced; a failed mode change publishes no name, and a later take succeeds; a lock file an
   interrupted earlier release left without owner access is refused with the recovery pointer and is not
   changed.
-- `ota-cli/tests/umask.rs`: under a restrictive umask, a failed mode change publishes nothing, and six
+- `delta-update-cli/tests/umask.rs`: under a restrictive umask, a failed mode change publishes nothing, and six
   contenders for one new name, two of them failing their mode change, leave exactly one private lock file
   that the others see as held or refused.
-- `ota-cli/src/roles.rs`: a checkpoint parent retargeted after the payload is opened is compared in the
+- `delta-update-cli/src/roles.rs`: a checkpoint parent retargeted after the payload is opened is compared in the
   directory it then names, and refused as an alias of the device; a parent retargeted to a payload alias is
   refused; an old image that is the device is refused and the device is untouched; a payload path replaced
   after it was opened is compared by the file that was opened.
-- `ota-cli/src/filedevice.rs`: a regular file is locked through a hard link and released on drop; a
+- `delta-update-cli/src/filedevice.rs`: a regular file is locked through a hard link and released on drop; a
   different file is not blocked; a regular-file lock creates nothing in the namespace; the lock follows
   the device number, and other file types are refused.
-- `ota-cli/tests/locks.rs`: a checkpoint held by another run refuses another target on both the buffered
+- `delta-update-cli/tests/locks.rs`: a checkpoint held by another run refuses another target on both the buffered
   and streamed paths with no write and no record; a held record refuses a reset and keeps it; a
   symbolic-linked directory names the same lock; a run refused on its device leaves the checkpoint free;
   an unrelated checkpoint and device pair, in another directory, proceeds; a record named `state.lock` is
@@ -1143,18 +1143,18 @@ and §5.2.
   in the namespace, not beside the record; an old sidecar `<name>.lock` is neither used nor removed. Two
   device nodes for one block device contend, when `OTA_TEST_BLOCK_DEVICE` names a block device and the
   process may create device nodes (§7.1 of `docs/locking-and-recovery.md`).
-- `ota-cli/tests/policy.rs`: a checkpoint that is the payload by hard link is refused on both the buffered
+- `delta-update-cli/tests/policy.rs`: a checkpoint that is the payload by hard link is refused on both the buffered
   and the streamed path, with no write.
-- `ota-client/tests/policy.rs`: a kept sparse chunk with an uncovered range is refused by both
+- `delta-update-client/tests/policy.rs`: a kept sparse chunk with an uncovered range is refused by both
   write-only sink methods with no write and no record change.
-- `ota-client/src/checkpoint.rs`: a replacement that fails its sync is visible, is lost by a crash until it is confirmed, and
+- `delta-update-client/src/checkpoint.rs`: a replacement that fails its sync is visible, is lost by a crash until it is confirmed, and
   is refused by a failed confirmation; a confirmed replacement survives a crash; a durable record confirms without a fault.
-- `ota-client/tests/durability.rs`: for every replacement, a visible unconfirmed record is refused by a resume with no
+- `delta-update-client/tests/durability.rs`: for every replacement, a visible unconfirmed record is refused by a resume with no
   write, and a resume after confirmation completes; a power cut that loses an unconfirmed record resumes from the record
   that was durable; a reset does not wait for a confirmation.
-- `ota-cli/tests/durability.rs`: the same sequence on the file store and a real device, with an injected failed directory
+- `delta-update-cli/tests/durability.rs`: the same sequence on the file store and a real device, with an injected failed directory
   sync: the retries are refused with no write, and a lost first rename leaves no record, from which the update completes.
-- `ota-cli/src/filecheckpoint.rs`: a rename whose record directory sync fails, and one whose staging directory sync fails,
+- `delta-update-cli/src/filecheckpoint.rs`: a rename whose record directory sync fails, and one whose staging directory sync fails,
   are refused by the confirmation until a sync works; a crash that keeps or loses the rename resumes the record it leaves;
   a second link to the record left by an unfinished publication is removed on open, by lookup of its name; an
   initialization interrupted at any of the seven steps, and at any pair of steps, is completed by the next open, and no
@@ -1179,17 +1179,17 @@ and §5.2.
   among them when the sweep's window holds 256 directories it cannot remove and does not reach them, keeps the links and other entries, and fails before its
   rename when a look-up or removal of one of them fails; a published directory wins over a leftover initialization
   directory beside it.
-- `ota-cli/tests/staging_umask.rs`: under the umasks `0022`, `0277`, `0577`, `0377` and `0777`, a directory and marker
+- `delta-update-cli/tests/staging_umask.rs`: under the umasks `0022`, `0277`, `0577`, `0377` and `0777`, a directory and marker
   left by an interrupted creation (no directory, an empty marker, a torn marker, a complete unsynced marker) are completed
   by the next open, which then loads and replaces the record, and leaves the directory `0700` and the marker `0600`. This
   file holds the only test of its binary, since the umask is process-wide. It is run as a non-privileged user, since a
   privileged user passes the permission checks whatever the mode.
-- `ota-cli/tests/reset.rs`: a streamed reset clears the record, writes nothing, and refuses another target, a base-dependent
+- `delta-update-cli/tests/reset.rs`: a streamed reset clears the record, writes nothing, and refuses another target, a base-dependent
   device holding the new image, and a held device, with the record kept; a streamed reset needs no payload body, where the
   buffered reset must read it; a payload over `--max-buffered-payload` resets streamed and is refused buffered.
-- `ota-cli/tests/limits.rs`: a buffered payload over the limit is refused before any write; a payload of exactly the limit
+- `delta-update-cli/tests/limits.rs`: a buffered payload over the limit is refused before any write; a payload of exactly the limit
   applies, and one byte less is refused; a streamed apply is not bound by the limit; a named pipe and a character device are
   refused as payload and as key without waiting or reading; an oversized key file is refused before it is parsed.
-- `ota-cli/src/main.rs`: the bounded reader reads a reader of exactly the limit, refuses one byte more as it grows, reports a
+- `delta-update-cli/src/main.rs`: the bounded reader reads a reader of exactly the limit, refuses one byte more as it grows, reports a
   read error with its path, keeps its buffer within the limit, and refuses a regular file over the limit before a read and a
   directory without one.

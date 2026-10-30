@@ -1,6 +1,6 @@
 # Complete-payload signature verification
 
-`ota_payload::verify` authenticates a payload: it checks the metadata signature
+`delta_update_payload::verify` authenticates a payload: it checks the metadata signature
 over the raw header and manifest bytes, then the payload signature over the
 header, manifest and blobs. It is the only code that produces an
 `Authenticated` value, so code that accepts one can rely on the signatures
@@ -12,7 +12,7 @@ having been checked.
 - Used by the buffered pipeline directly, and by the streaming pipeline through
   `verify_message` on each signature message as it is read.
 - Does **not** interpret the manifest's application semantics. That is
-  `ota_payload::plan`, which runs after authentication.
+  `delta_update_payload::plan`, which runs after authentication.
 - Does not compare an externally supplied whole-file hash. That is a transport
   concern, out of scope.
 
@@ -107,10 +107,10 @@ the first write.
 
 | Caller | Uses |
 | --- | --- |
-| `ota-client::apply::prepare` (verified) | `verify_payload`, then `plan::validate` |
-| `ota-client::stream::prepare` (verified) | `verify_message` on the metadata signature, then `decode_manifest` and `plan::validate`; `verify_message` again on the payload signature at end of stream |
-| `ota-generator` self-check | `verify_payload` under the same profile, with the public key derived from the private key, then `plan::validate` on the authenticated manifest |
-| `ota-cli` tests | `verify_payload` directly, for tamper and key-rotation cases |
+| `delta_update_client::apply::prepare` (verified) | `verify_payload`, then `plan::validate` |
+| `delta_update_client::stream::prepare` (verified) | `verify_message` on the metadata signature, then `decode_manifest` and `plan::validate`; `verify_message` again on the payload signature at end of stream |
+| `delta-update-generator` self-check | `verify_payload` under the same profile, with the public key derived from the private key, then `plan::validate` on the authenticated manifest |
+| `delta-update-cli` tests | `verify_payload` directly, for tamper and key-rotation cases |
 
 ## 7. Tests
 

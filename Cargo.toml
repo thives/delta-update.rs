@@ -1,11 +1,11 @@
 [workspace]
 resolver = "2"
 members = [
-    "ota-payload",
-    "ota-client",
-    "ota-generator",
-    "ota-cli",
-    "ota-cli-args",
+    "delta-update-payload",
+    "delta-update-client",
+    "delta-update-generator",
+    "delta-update-cli",
+    "delta-update-cli-args",
 ]
 
 [workspace.package]

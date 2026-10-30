@@ -11,8 +11,8 @@ Three kinds of figure appear here, and they are labelled throughout:
 
 | Kind | Source | Trust |
 | --- | --- | --- |
-| **Enforced model limit** | `ota_payload::profile::Usage` and the scanner's count and size checks, computed from wire bytes | Enforced before prost allocates. Each bound is an upper bound, under the assumptions in §3. |
-| **Host measurement** | `ota-client/tests/peak_memory.rs`, `peak_stream.rs`, `peak_completed.rs` | A counting allocator on the host, simulating the target's worst cases (§3). It is not a measurement of the device. |
+| **Enforced model limit** | `delta_update_payload::profile::Usage` and the scanner's count and size checks, computed from wire bytes | Enforced before prost allocates. Each bound is an upper bound, under the assumptions in §3. |
+| **Host measurement** | `delta-update-client/tests/peak_memory.rs`, `peak_stream.rs`, `peak_completed.rs` | A counting allocator on the host, simulating the target's worst cases (§3). It is not a measurement of the device. |
 | **Unmeasured** | not measured anywhere | Device RAM, stack, the real allocator and its fragmentation, and the riscv32 runtime. No emulator is available. |
 
 ## 1. What is bounded, and how
@@ -58,7 +58,7 @@ only moves the coalescing boundary (§5.2).
 
 Element bounds (`OP_COST` 192, `EXTENT_COST` 32, `PARTITION_COST` 512,
 `SIGNATURE_COST` 48) are upper bounds on the host `size_of` of the prost types.
-A `const` assertion in `ota-payload::manifest` checks each bound at compile time,
+A `const` assertion in `delta_update_payload::manifest` checks each bound at compile time,
 for every target, including riscv32.
 
 ### 2.1 Transients
@@ -307,11 +307,11 @@ measurement, and it does not account for the stack or the device's allocator (§
 Every figure in this section comes from the simulated allocator, so debug and
 release builds give the same numbers. The simulation counts allocations, and the
 code allocates the same way at either optimization level. The release check is
-`cargo test --release -p ota-client --test peak_memory --test peak_stream --test peak_completed`.
+`cargo test --release -p delta-update-client --test peak_memory --test peak_stream --test peak_completed`.
 
 ### 5.1 Host measurements, simulated allocator, manifests
 
-`cargo test -p ota-client --test peak_memory -- --nocapture` decodes 229 manifest
+`cargo test -p delta-update-client --test peak_memory -- --nocapture` decodes 229 manifest
 shapes under the embedded profile with its budget lifted, so every count-valid
 shape is compared with its model. The shapes are:
 
@@ -358,13 +358,13 @@ figure and the edge are unchanged, because the bound is the same. At 64 operatio
 extents and both hashes the model is 37,736 B, which is refused. The generator
 therefore coalesces that delta rather than emitting it.
 
-`ota-client/tests/peak_memory.rs` checks both edges. 45 is admitted, and 46 is
+`delta-update-client/tests/peak_memory.rs` checks both edges. 45 is admitted, and 46 is
 refused with `resource_limit`.
 
 ### 5.3 The generator is unchanged in output
 
 The stricter budget refuses the largest manifests, and the generator coalesces
-them. The 16 MiB target-scale tests in `ota-client/tests/target_scale.rs` and the
+them. The 16 MiB target-scale tests in `delta-update-client/tests/target_scale.rs` and the
 generator's own target-scale tests pass unchanged, and they check that each
 payload fits the embedded profile and applies through both pipelines. The
 duplicate rule does not change the generator's output, because prost writes each
@@ -425,7 +425,7 @@ two terms measured separately.
 
 ### 5.6 End-to-end streamed peaks
 
-`ota-client/tests/peak_stream.rs` streams three payloads through `stream::prepare`
+`delta-update-client/tests/peak_stream.rs` streams three payloads through `stream::prepare`
 and then `Prepared::apply`, counting every allocation in each window. The
 windows open in pipeline order, so the apply window includes what prepare leaves
 live.
@@ -463,7 +463,7 @@ xychart-beta
 
 ### 5.7 Completed re-apply, and the fresh path against HEAD
 
-`ota-client/tests/peak_completed.rs` re-applies a completed compressed update on the
+`delta-update-client/tests/peak_completed.rs` re-applies a completed compressed update on the
 streamed path. The first run is not measured. The window opens after `stream::prepare`,
 so the figure is what the apply allocates above the prepared state. The bound is one
 chunk buffer and one signature buffer, which are the only allocations a completed
@@ -489,7 +489,7 @@ still matched. The search-generated payloads therefore vary between runs. The fi
 
 ### 5.8 Contract workspace
 
-`ota-client/tests/peak_memory.rs` measures `validate` alone, with the decoded message already live,
+`delta-update-client/tests/peak_memory.rs` measures `validate` alone, with the decoded message already live,
 for five shapes: 1×1, 1×2, 2×64, 1×128 and 8×16 destination extents. Each measured peak is at least
 the workspace the derivation needs (`SPAN_COST` per interval) and at most that workspace plus the
 24 B of allocator bookkeeping.
@@ -518,7 +518,7 @@ tests would distort each other's windows.
 - **Allocator overhead and fragmentation.** §3 A1 is a stated assumption, simulated
   on the host. Fragmentation is not modeled.
 - **Stack.** Not measured at run time on any target. The compiled frame sizes below are from the
-  riscv32 release build's assembly (`ota-client`, `riscv32imac-unknown-none-elf`), measured for this
+  riscv32 release build's assembly (`delta-update-client`, `riscv32imac-unknown-none-elf`), measured for this
   revision and for HEAD in a separate target directory: `apply::prepare` 1,408 B (HEAD 1,392 B),
   `decode_manifest` 560 B (HEAD 560 B), `plan::validate` 160 B (HEAD 96 B, the increase being
   `derive_contract` inlined into it), `BlockDecoder::new` 256 B and `BlockDecoder::decode` 32 B (both
@@ -563,7 +563,7 @@ tests would distort each other's windows.
 | `peak_memory` copy-check workspace | A `TARGET_COPY` of 1, 16 and 64 extents per list: the measured peak lies between its workspace and that plus 24 B, which is the scanner's charge for the one-operation manifest (§5.8). |
 
 The release memory tests were re-run after the packed-component limits and the raw
-fallback (`cargo test --release -p ota-client --test peak_memory --test peak_stream`), and again with `--test peak_completed` for §5.7.
+fallback (`cargo test --release -p delta-update-client --test peak_memory --test peak_stream`), and again with `--test peak_completed` for §5.7.
 The component checks refuse exactly the shapes
 that `docs/format.md` §10 excludes, and the combined bound still admits every shape
 within them. The fallback is reached only for images the capped search cannot fit.

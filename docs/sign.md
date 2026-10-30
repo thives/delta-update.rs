@@ -2,7 +2,7 @@
 
 ## Purpose and scope
 
-`ota-payload/src/sign.rs` implements the signature-serialization APIs:
+`delta-update-payload/src/sign.rs` implements the signature-serialization APIs:
 `sig_entry_size`, `signature_message_size`, and `build_signature_message`.
 The generator uses them to reserve metadata and payload signature slots
 before signing, then fill those slots without changing the signed header
@@ -140,9 +140,9 @@ Six unit tests cover:
 
 Validation performed:
 
-- `cargo test -p ota-payload`: all unit tests pass, including the 6
+- `cargo test -p delta-update-payload`: all unit tests pass, including the 6
   signing tests; doc-tests pass.
-- `cargo test --workspace`: passes, including the 5 `ota-cli` end-to-end
+- `cargo test --workspace`: passes, including the 5 `delta-update-cli` end-to-end
   tests (the earlier non-contiguous-operation failures came from the
   hand-rolled manifest decoder and are gone with prost codegen).
 - `cargo build --workspace`: clean, no warnings.

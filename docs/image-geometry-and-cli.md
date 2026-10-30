@@ -157,25 +157,25 @@ physical storage. The engine still applies exactly **one** partition; raising
 ## 4. Shared CLI arguments without a `no_std` dependency leak
 
 Both host commands use clap for help, versions, option parsing and usage errors.
-The new `ota-cli-args` crate is `std`-only and owns `ResourceArgs`, the one-to-one
+The new `delta-update-cli-args` crate is `std`-only and owns `ResourceArgs`, the one-to-one
 conversion into `ResourceProfile`, and the parser wrapper that includes usage
 on argument errors. It does not implement device selection, payload transport,
 generation or application.
 
 ```mermaid
 flowchart TD
-    G[ota-gen: ota-generator host binary] --> A[ota-cli-args: shared parser and ResourceArgs]
-    C[ota-apply: ota-cli host binary] --> A
+    G[ota-gen: delta-update-generator host binary] --> A[delta-update-cli-args: shared parser and ResourceArgs]
+    C[ota-apply: delta-update-cli host binary] --> A
     A --> CL[clap: std-only argument parsing]
-    A --> P[ota-payload: no_std plus alloc, ResourceProfile and format policy]
+    A --> P[delta-update-payload: no_std plus alloc, ResourceProfile and format policy]
     G --> P
-    C --> E[ota-client: no_std apply engine]
+    C --> E[delta-update-client: no_std apply engine]
     E --> P
 ```
 
 Arrows show relevant dependency directions, not every third-party dependency.
-The clap dependency stays in the host layer; neither `ota-payload` nor
-`ota-client` depends on the argument crate or clap. Sharing all 12 cap fields
+The clap dependency stays in the host layer; neither `delta-update-payload` nor
+`delta-update-client` depends on the argument crate or clap. Sharing all 12 cap fields
 prevents the two binaries from drifting on defaults, units or option spellings.
 The libraries retain `EMBEDDED` and `HOST` presets and arbitrary custom profiles:
 these are sets of numeric limits, not branches selecting different behavior.
@@ -262,24 +262,24 @@ are not new performance/memory measurements.
 
 | Evidence | Contract pinned |
 | --- | --- |
-| `ota-generator/tests/sizes.rs`, `gpu_eval.rs` | Generated grow/shrink and empty images; unknown zero growth needs writes; target-copy reads need prior writes, on the CPU's model and on the device's; old source bounds independent of new bounds; GPU classification never keeps growth |
-| `ota-generator/tests/regressions.rs` | Checker bounds even without recorded sizes; unwritten growth refused rather than accepted as zero |
-| `ota-client/tests/sizes.rs` | Both pipelines: prepared logical label under verified and unverified trust, grow/shrink prefix hashes, unchanged capacity/tails, independent A/B source sizes, old-image validation without source copies, insufficient old/new prefix capacity, kept/untouched target semantics, interruption and resume |
-| `ota-client/tests/full.rs` | Full payload starting contents, undersized-target refusal, corrupt data boundaries and resumability |
-| `ota-cli-args/src/lib.rs` tests | Defaults equal `EMBEDDED`; every field independent; zero/native maxima and invalid integer bounds |
-| `ota-generator/tests/cli.rs` | Help/version, option names/defaults, removed-profile rejection, full-mode conflicts, numeric bounds, explicit caps, no-op zero cap, positional counts, option placement and runtime exit status |
-| `ota-cli/tests/args.rs` | Help/version and usage exit 2; explicit caps refuse before writes/checkpoints on both paths; larger destination keeps tail; no-op zero cap; missing files exit 1 |
+| `delta-update-generator/tests/sizes.rs`, `gpu_eval.rs` | Generated grow/shrink and empty images; unknown zero growth needs writes; target-copy reads need prior writes, on the CPU's model and on the device's; old source bounds independent of new bounds; GPU classification never keeps growth |
+| `delta-update-generator/tests/regressions.rs` | Checker bounds even without recorded sizes; unwritten growth refused rather than accepted as zero |
+| `delta-update-client/tests/sizes.rs` | Both pipelines: prepared logical label under verified and unverified trust, grow/shrink prefix hashes, unchanged capacity/tails, independent A/B source sizes, old-image validation without source copies, insufficient old/new prefix capacity, kept/untouched target semantics, interruption and resume |
+| `delta-update-client/tests/full.rs` | Full payload starting contents, undersized-target refusal, corrupt data boundaries and resumability |
+| `delta-update-cli-args/src/lib.rs` tests | Defaults equal `EMBEDDED`; every field independent; zero/native maxima and invalid integer bounds |
+| `delta-update-generator/tests/cli.rs` | Help/version, option names/defaults, removed-profile rejection, full-mode conflicts, numeric bounds, explicit caps, no-op zero cap, positional counts, option placement and runtime exit status |
+| `delta-update-cli/tests/args.rs` | Help/version and usage exit 2; explicit caps refuse before writes/checkpoints on both paths; larger destination keeps tail; no-op zero cap; missing files exit 1 |
 
 Focused commands (generator size tests require the software Vulkan setup described
 in `README.md`):
 
 ```sh
-cargo test -p ota-cli-args
-cargo test -p ota-generator --test sizes --test cli
-cargo test -p ota-generator --test regressions
-cargo test -p ota-client --test sizes --test full
-cargo test -p ota-cli --test args
-cargo check -p ota-client --target riscv32imac-unknown-none-elf
+cargo test -p delta-update-cli-args
+cargo test -p delta-update-generator --test sizes --test cli
+cargo test -p delta-update-generator --test regressions
+cargo test -p delta-update-client --test sizes --test full
+cargo test -p delta-update-cli --test args
+cargo check -p delta-update-client --target riscv32imac-unknown-none-elf
 ```
 
 The embedded check verifies the dependency boundary at compile time; it is not

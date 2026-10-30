@@ -1,6 +1,6 @@
 import re, sys, math
 
-src = open('ota-payload/src/sha256.rs').read()
+src = open('delta-update-payload/src/sha256.rs').read()
 
 # Pull the IV and K arrays out of the Rust source.
 def grab(name):

@@ -1,0 +1,22 @@
+[package]
+name = "delta-update-cli"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+edition.workspace = true
+description = "Reference host bindings: file-backed device and the ota-apply tool."
+
+[[bin]]
+name = "ota-apply"
+path = "src/main.rs"
+
+[dependencies]
+clap = { workspace = true }
+# Only for `O_NOFOLLOW`, which makes the checkpoint open refuse a symbolic link. The crate is
+# already in the lock file for other dependencies, so this adds no new code to the build.
+libc = "0.2"
+delta-update-cli-args = { path = "../delta-update-cli-args" }
+delta-update-client = { path = "../delta-update-client" }
+delta-update-payload = { path = "../delta-update-payload" }
+
+[dev-dependencies]
+delta-update-generator = { path = "../delta-update-generator" }

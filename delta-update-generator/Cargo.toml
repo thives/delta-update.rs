@@ -1,0 +1,21 @@
+[package]
+name = "delta-update-generator"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+edition.workspace = true
+description = "std OTA delta generator: program search on Vulkan compute, payload assembly and RSA signing."
+
+[dependencies]
+clap = { workspace = true }
+delta-update-cli-args = { path = "../delta-update-cli-args" }
+delta-update-payload = { path = "../delta-update-payload" }
+prost = { version = "0.14", default-features = false }
+miniz_oxide = { version = "0.9", features = ["with-alloc"] }
+ash = { version = "0.38", default-features = false, features = ["loaded"] }
+
+[[bin]]
+name = "ota-gen"
+path = "src/main.rs"
+
+[dev-dependencies]
+libc = "0.2"

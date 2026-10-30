@@ -2,7 +2,7 @@
 
 ## Purpose and scope
 
-`ota-payload/src/rsa.rs` implements PEM key loading and prehashed RSA signatures
+`delta-update-payload/src/rsa.rs` implements PEM key loading and prehashed RSA signatures
 using RustCrypto's `rsa` crate. It does not implement RSA arithmetic, ASN.1/DER,
 PEM decoding, DigestInfo encoding, or PKCS#1 padding itself. Payload transport,
 payload hashing, and protobuf signature-message encoding remain outside this
@@ -93,7 +93,7 @@ integer representation.
 
 RSA key storage and cryptographic operations allocate. A `no_std` consumer must
 provide an allocator. Verification of one RSA-4096 signature peaks at about
-23 KiB of heap in the host measurement (`ota-client/tests/peak_memory.rs`, on a
+23 KiB of heap in the host measurement (`delta-update-client/tests/peak_memory.rs`, on a
 simulated allocator, `docs/memory.md` §5.5). The phase budget charges that
 workspace on top of the decoded manifest, where the two are live together. The
 fixed signature return buffer does not make the cryptographic implementation
@@ -135,15 +135,15 @@ not a production secret. `sig4096.bin` is generated with:
 
 ```sh
 openssl dgst -sha256 \
-  -sign ota-payload/tests/fixtures/private4096.pem \
-  -out ota-payload/tests/fixtures/sig4096.bin \
-  ota-payload/tests/fixtures/msg.bin
+  -sign delta-update-payload/tests/fixtures/private4096.pem \
+  -out delta-update-payload/tests/fixtures/sig4096.bin \
+  delta-update-payload/tests/fixtures/msg.bin
 ```
 
 The normal test command is:
 
 ```sh
-cargo test -p ota-payload --lib rsa::tests --offline
+cargo test -p delta-update-payload --lib rsa::tests --offline
 ```
 
 At implementation time, the crate already contained missing `der`/`pem` modules
@@ -172,9 +172,9 @@ Its `lib.rs` imports the real modules, without copying their implementations:
 ```rust
 #![no_std]
 
-#[path = "../../ota-payload/src/error.rs"]
+#[path = "../../delta-update-payload/src/error.rs"]
 pub mod error;
-#[path = "../../ota-payload/src/rsa.rs"]
+#[path = "../../delta-update-payload/src/rsa.rs"]
 pub mod rsa;
 ```
 
@@ -184,7 +184,7 @@ Run it from the workspace root with:
 cargo test --manifest-path target/rsa-validation/Cargo.toml --offline
 cargo check --manifest-path target/rsa-validation/Cargo.toml --offline
 cargo clippy --manifest-path target/rsa-validation/Cargo.toml --offline --all-targets -- -D warnings
-rustfmt --edition 2021 --check ota-payload/src/rsa.rs
+rustfmt --edition 2021 --check delta-update-payload/src/rsa.rs
 git diff --check
 ```
 

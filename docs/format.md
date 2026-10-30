@@ -57,7 +57,7 @@ byte-range revision, and it is the only one this project applies.
 Revision 16 and earlier gave extent fields the meaning of block counts. Under
 revision 17 the same tags carry byte offsets and lengths, so an old payload is
 refused before any of its extents is used. The constant is
-`ota_payload::layout::PROJECT_MINOR`. Breaking changes to the wire are allowed by
+`delta_update_payload::layout::PROJECT_MINOR`. Breaking changes to the wire are allowed by
 the project's rules, so the refusal is the compatibility mechanism.
 
 ## 3. Byte ranges, the logical stream and chunks
@@ -277,7 +277,7 @@ the client refuses a copy whose source does not match it.
 ### 5.1 `SOURCE_COPY` (type 4): from the old image
 
 - The source is the **immutable old image**, which is a separate capability from
-  the target (`ota_client::image::OldImage`). A copy never reads the target.
+  the target (`delta_update_client::image::OldImage`). A copy never reads the target.
 - `src_length`, when present, equals the total length.
 - The source must lie inside the old image's capacity. When the manifest records
   the old partition's size, the image must have exactly that size.
@@ -369,7 +369,7 @@ therefore stated here.
   `Trust::Verified` authenticates that label; unverified preparation does not.
   The engine still applies exactly one partition, regardless of resource caps.
 - **The target is exclusive** during the apply and during every recovery. No
-  other writer may touch it, and the target must not be the old image. `ota-cli`
+  other writer may touch it, and the target must not be the old image. `delta-update-cli`
   refuses a source path that resolves to the device's own file. That check does
   not see two partitions that share one disk.
 - **A failed write** may leave part of its requested range modified. It must not
@@ -383,7 +383,7 @@ therefore stated here.
 ## 9. Validation summary
 
 The plan refuses each of these before any write. Codes are in
-`ota_payload::error::Code`.
+`delta_update_payload::error::Code`.
 
 | Condition | Code |
 | --- | --- |

@@ -271,7 +271,7 @@ workspace is the largest transient by 512 B, so it decides the budget.
 
 ### 4.1 Parity tests
 
-`ota-generator/tests/gpu_eval.rs` checks the device against the CPU on this shape:
+`delta-update-generator/tests/gpu_eval.rs` checks the device against the CPU on this shape:
 
 - `the_contract_workspace_is_charged_on_the_device_one_byte_either_side_of_the_decoded_limit`: four
   shapes, each first checked to have the workspace as its largest transient. For each, the device and the
@@ -441,14 +441,14 @@ an older process may still hold one.
 | a record named as a staging file or a case probe is refused before the lock, and the other store's entry is left as it was | `filecheckpoint.rs::a_record_named_as_a_staging_file_is_refused_before_the_lock_and_no_staging_file_is_taken_over`, `filecheckpoint.rs::a_record_named_as_a_case_probe_is_refused_and_a_probe_in_flight_is_left_alone`, `locks.rs::a_checkpoint_named_with_the_reserved_prefix_is_refused_before_any_lock_or_write` |
 | the reserved prefix is refused in any ASCII case and matched whole | `filecheckpoint.rs::the_reserved_prefix_is_refused_in_any_ascii_case_and_only_as_a_whole_prefix` |
 | a probe that cannot run refuses the store and releases the lock | `filecheckpoint.rs::a_probe_that_cannot_run_refuses_the_store_and_releases_its_lock` |
-| a failed look-up after an absent load is uncertain, and confirms nothing | `filecheckpoint.rs::a_failed_look_up_after_an_absent_load_is_uncertain_and_confirms_nothing`, `ota-cli/src/main.rs::tests::an_uncertain_reset_tells_the_operator_to_run_the_reset_again_and_not_to_apply` (the operator's guidance) |
+| a failed look-up after an absent load is uncertain, and confirms nothing | `filecheckpoint.rs::a_failed_look_up_after_an_absent_load_is_uncertain_and_confirms_nothing`, `delta-update-cli/src/main.rs::tests::an_uncertain_reset_tells_the_operator_to_run_the_reset_again_and_not_to_apply` (the operator's guidance) |
 | the entry identity is read through the pinned directory without following a link | `filecheckpoint.rs::the_entry_identity_is_the_records_or_none_and_a_link_at_the_name_is_its_own_entry` |
 | roles are compared using open handles and the pinned checkpoint entry, before device writes, after a parent or payload path is retargeted | `roles.rs::a_checkpoint_parent_retargeted_after_the_payload_is_opened_is_checked_in_the_directory_it_now_names`, `roles.rs::a_checkpoint_parent_retargeted_to_a_directory_holding_the_payload_is_refused_as_its_alias`, `roles.rs::a_payload_path_replaced_after_it_was_opened_is_compared_by_the_file_that_was_opened`, `roles.rs::an_old_image_that_is_the_device_under_a_retargeted_parent_is_refused_and_the_device_is_untouched` |
 | a streamed payload pass reads the file that was authenticated, after its path is replaced | `filesource.rs::a_copy_of_the_pinned_handle_reads_the_file_that_was_opened_after_its_path_is_replaced` |
 | a checkpoint that is the payload by hard link is refused on both paths, with no write | `policy.rs::a_checkpoint_that_is_the_payload_by_hard_link_is_refused_on_both_paths_before_any_write` |
 | a folding directory refuses the store, before and after the record exists, and releases its lock | `filecheckpoint.rs::a_folding_directory_is_refused_whether_or_not_the_record_exists_and_releases_its_lock` (injected result); `filecheckpoint.rs::a_case_folded_directory_refuses_the_record_before_and_after_it_exists` (env-gated: platform validation, not run here) |
 | the case probe leaves nothing behind on a case-sensitive directory | `filecheckpoint.rs::the_case_probe_of_a_case_sensitive_directory_passes_and_leaves_no_probe_behind` |
-| `confirm_absent` refuses a stored record and leaves it, and refuses a dangling link at the name | `filecheckpoint.rs::confirm_absent_refuses_a_stored_record_and_removes_nothing`, `filecheckpoint.rs::confirm_absent_refuses_a_dangling_link_at_the_record_name_and_removes_nothing`, `ota-client/src/checkpoint.rs::confirm_absent_refuses_a_stored_record_and_leaves_it_in_place` |
+| `confirm_absent` refuses a stored record and leaves it, and refuses a dangling link at the name | `filecheckpoint.rs::confirm_absent_refuses_a_stored_record_and_removes_nothing`, `filecheckpoint.rs::confirm_absent_refuses_a_dangling_link_at_the_record_name_and_removes_nothing`, `delta-update-client/src/checkpoint.rs::confirm_absent_refuses_a_stored_record_and_leaves_it_in_place` |
 
 ## 8. The checkpoint's directory, names, absence and lock-file mode
 
@@ -656,7 +656,7 @@ A namespace on a filesystem without `O_TMPFILE` is refused with a message, rathe
 
 A run names four files: the payload, the device, the checkpoint and the old image. Before this release, an alias check
 read each path with `stat` before anything was opened, and a link in a path could be retargeted between that check and
-the open. The check now runs on the handles, after all four are open, and before any write (`ota-cli/src/roles.rs`):
+the open. The check now runs on the handles, after all four are open, and before any write (`delta-update-cli/src/roles.rs`):
 
 ```mermaid
 flowchart TD
@@ -698,7 +698,7 @@ that decides whether two roles are one object. §10.3 gives the lock each role t
 §10.4 says why the identity comparison comes before device and old-image identity locks. §10.5 is the reset, which no longer opens the old image.
 §10.6 is the staging files: their names, and when a stale one is removed. §10.7 is the publication test. §10.8 separates
 what the tool enforces from what the host must provide, §10.9 lists the validation that remains, and §10.10 maps each claim
-to its test. The code is in `ota-cli/src/identity.rs`, `filelock.rs`, `filedevice.rs`, `fileimage.rs`, `roles.rs`,
+to its test. The code is in `delta-update-cli/src/identity.rs`, `filelock.rs`, `filedevice.rs`, `fileimage.rs`, `roles.rs`,
 `filecheckpoint.rs` and `main.rs`.
 
 ### 10.1 What changed, and why
@@ -1029,14 +1029,14 @@ mode change publishes no name, and a later take creates a private file. The cont
 | a replacement whose 16 names are occupied removes the single-link files among them past a full sweep window, keeps links and other entries, and fails before rename on a failed look-up or removal | `filecheckpoint.rs::stale_files_at_every_name_of_a_replacement_past_a_full_sweep_window_are_removed_and_the_entries_that_cannot_be_removed_stay`, `filecheckpoint.rs::remove_stale_candidates_removes_only_single_link_files_at_its_own_names`, `filecheckpoint.rs::a_failed_look_up_or_removal_of_a_stale_candidate_is_an_error_and_keeps_the_candidates` |
 | a record's second link is removed by lookup past a full sweep window, and each of its look-up, removal and sync failures refuses the open | `filecheckpoint.rs::the_record_staging_link_is_removed_on_open_even_past_a_full_sweep_window_of_entries_that_cannot_be_removed`, `filecheckpoint.rs::a_failed_look_up_while_removing_the_link_is_an_error_and_the_link_is_kept`, `filecheckpoint.rs::a_link_that_cannot_be_removed_refuses_the_open_and_the_next_open_removes_it`, `filecheckpoint.rs::a_removal_that_is_not_confirmed_durable_refuses_every_open_until_a_sync_confirms_it`, `filecheckpoint.rs::every_open_syncs_the_staging_directory_even_when_no_second_link_is_found` |
 | a failed listing leaves the sweep's debris and does not affect the record's own link | `filecheckpoint.rs::a_failed_listing_leaves_the_debris_and_the_record_link_is_still_found_by_name` |
-| initialization under restrictive umasks is completed by the next open | `filecheckpoint.rs::an_initialization_left_with_umask_modes_is_completed_by_the_next_open_at_every_step`, `ota-cli/tests/staging_umask.rs` |
+| initialization under restrictive umasks is completed by the next open | `filecheckpoint.rs::an_initialization_left_with_umask_modes_is_completed_by_the_next_open_at_every_step`, `delta-update-cli/tests/staging_umask.rs` |
 | entries of another form that fill a window are not removed, and the record is kept | `filecheckpoint.rs::entries_of_another_form_that_take_every_name_are_not_removed_and_the_replacement_fails_keeping_the_record` |
 | a store resumes its record after an interrupted replacement | `filecheckpoint.rs::a_later_store_resumes_its_record_past_the_staging_file_of_an_interrupted_replacement` |
 | a visible record whose sync failed is refused until confirmed, and a crash keeps or loses its rename | `filecheckpoint.rs::a_renamed_record_whose_directory_sync_failed_is_visible_but_refused_until_a_confirmation_succeeds`, `filecheckpoint.rs::a_crash_that_keeps_an_unconfirmed_rename_resumes_the_new_record_once_it_is_confirmed`, `filecheckpoint.rs::a_crash_that_loses_an_unconfirmed_rename_leaves_the_previous_record_which_confirms_and_resumes` |
 | a second link to the record left by an unfinished publication is removed on open | `filecheckpoint.rs::a_second_link_to_the_record_left_by_an_unfinished_publication_is_removed_on_open` |
 | an initialization interrupted at any step, and at any pair of steps, completes, and no canonical directory lacks its marker | `filecheckpoint.rs::an_initialization_interrupted_at_any_step_is_completed_by_the_next_open_and_never_published_without_its_marker` |
 | a torn marker is discarded and made again; an initialization directory of another shape is refused, and keeps its mode when its owner can read and search it; a directory the owner can read but not search has its owner bits restored before its marker is checked; a refused marker in a directory the owner cannot read is restored, and its refusal names read and search; a directory the owner cannot search can be moved aside whole, and the next open starts afresh | `filecheckpoint.rs::a_torn_marker_in_an_abandoned_initialization_is_discarded_and_made_again`, `filecheckpoint.rs::an_initialization_directory_that_is_not_its_own_shape_is_refused_and_untouched`, `filecheckpoint.rs::an_initialization_directory_the_owner_can_read_is_refused_with_its_mode_and_entries_kept`, `filecheckpoint.rs::an_initialization_directory_the_owner_cannot_read_has_its_owner_bits_restored_before_the_refusal`, `filecheckpoint.rs::a_refused_marker_in_a_directory_the_owner_cannot_read_restores_its_mode_and_the_refusal_names_read_and_search`, `filecheckpoint.rs::an_initialization_directory_the_owner_can_search_keeps_its_mode_when_its_sole_marker_is_refused`, `filecheckpoint.rs::a_torn_marker_in_an_initialization_directory_the_owner_can_search_is_still_repaired`, `filecheckpoint.rs::a_directory_the_owner_can_read_but_not_search_has_its_owner_bits_restored_before_its_marker_is_checked`, `filecheckpoint.rs::an_initialization_directory_the_owner_cannot_search_is_moved_aside_whole_and_the_next_open_starts_afresh` |
-| a visible unconfirmed record on the file store, under a real apply, is refused with no write until confirmed | `ota-cli/tests/durability.rs` |
+| a visible unconfirmed record on the file store, under a real apply, is refused with no write until confirmed | `delta-update-cli/tests/durability.rs` |
 | contenders for a new name meet at the publication point, one publishes, and the rest are held | `filelock.rs::contenders_that_all_see_a_new_name_absent_publish_one_file_and_the_others_are_held_by_it` |
 | a failed mode change publishes no name, and its rival publishes one | `filelock.rs::a_contender_whose_mode_change_fails_at_publication_publishes_no_name_while_its_rival_publishes_one`, `filelock.rs::an_injected_mode_failure_is_reached_and_publishes_no_name_and_a_later_take_succeeds` |
 | two nodes for one real block device contend and are refused as one device | `tests/locks.rs::two_device_nodes_for_one_block_device_contend_through_the_namespace`, env-gated (§10.9) |
@@ -1097,7 +1097,7 @@ path lookup. That diagnostic lookup does not authorize any operation. All lock a
 `PayloadPin` owns the shared entry lock, its open file and the shared identity lock (or block lock file). It is acquired
 before metadata is read. Later sources clone the same open file rather than reopening the path. `run_stream` keeps the pin
 outside the one-shot source-opening closure, through `apply`, final target verification, completion-record replacement,
-and re-verification of an already complete update. The test seams in `ota-cli/tests/stream-locks.rs` probe the locks at
+and re-verification of an already complete update. The test seams in `delta-update-cli/tests/stream-locks.rs` probe the locks at
 those points; the test helper exercises the library path, while `main.rs` shows the CLI pin lifetime. Buffered apply and
 reset do not have this protection during their initial read; the host must keep their payload stable.
 
@@ -1126,7 +1126,7 @@ reset do not have this protection during their initial read; the host must keep 
   if unavailable they silently leave debris. The lock-file publication path separately requires `O_TMPFILE` and procfs
   linking (§9.1).
 
-Relevant regression tests include the entry and hard-link cases in `ota-cli/src/filelock.rs`, pinned-parent and final-link
-cases in `ota-cli/src/roles.rs` and `ota-cli/src/filesource.rs`, staging marker and bounded sweep cases in
-`ota-cli/src/filecheckpoint.rs`, and `ota-cli/tests/stream-locks.rs`. Tests do not establish mount-topology safety or
+Relevant regression tests include the entry and hard-link cases in `delta-update-cli/src/filelock.rs`, pinned-parent and final-link
+cases in `delta-update-cli/src/roles.rs` and `delta-update-cli/src/filesource.rs`, staging marker and bounded sweep cases in
+`delta-update-cli/src/filecheckpoint.rs`, and `delta-update-cli/tests/stream-locks.rs`. Tests do not establish mount-topology safety or
 real power-loss guarantees.

@@ -201,9 +201,9 @@ codec is released first, so it is not live with the signature check.
 ## 7. API
 
 ```rust
-use ota_client::checkpoint::TargetId;
+use delta_update_client::checkpoint::TargetId;
 
-let prepared = ota_client::stream::prepare(src, Trust::Verified(&keys), &EMBEDDED)?;
+let prepared = delta_update_client::stream::prepare(src, Trust::Verified(&keys), &EMBEDDED)?;
 let g = prepared.geometry();          // optional NEW length, chunk size, operations, reach
 let name = prepared.partition_name(); // adapter routing; authenticated under Verified only
 // The host opens the payload at the offset the checkpoint names. A fresh run is
@@ -224,25 +224,25 @@ A plan that copies from the old image is refused by `apply` with
 ## 8. What the tests pin
 
 - **Equivalence**: streamed and buffered results match, on fresh, interrupted and
-  resumed runs (`ota-client/tests/model.rs`, `resume.rs`).
+  resumed runs (`delta-update-client/tests/model.rs`, `resume.rs`).
 - **Every cut point**: a run cut at each of its writes, each flush and each
-  checkpoint replacement resumes to the target (`ota-client/tests/resume.rs`).
+  checkpoint replacement resumes to the target (`delta-update-client/tests/resume.rs`).
 - **Resume is by checkpoint**: an interrupted operation is replayed in full, and
   committed operations are skipped without being read or compared
-  (`ota-client/tests/frames.rs`, `sparse.rs`, `copy.rs`).
+  (`delta-update-client/tests/frames.rs`, `sparse.rs`, `copy.rs`).
 - **Idempotence**: a completed update, re-applied with its checkpoint, writes
   nothing, and its trailer is still refused. A target changed since completion is
-  refused (`ota-client/tests/resume.rs`, `ota-cli/tests/cli.rs`). Its allocations are
-  measured in `ota-client/tests/peak_completed.rs`.
+  refused (`delta-update-client/tests/resume.rs`, `delta-update-cli/tests/cli.rs`). Its allocations are
+  measured in `delta-update-client/tests/peak_completed.rs`.
 - **Short reads**: the source hands out 7-byte, 613-byte and 64 KiB pieces.
 - **Truncation and trailing bytes**: refused. A trailing byte is seen only at end
-  of stream, after the blobs were written (`ota-client/tests/regressions.rs`).
+  of stream, after the blobs were written (`delta-update-client/tests/regressions.rs`).
 - **Late rejection**: an unsupported operation or a bad hash is refused in
   `prepare`, before any device exists.
 - **Bounds before reads**: a manifest above the profile is refused after the
   header only, and the source cursor shows nothing else was read.
 - **Capacity before access**: an undersized device is refused with zero target
   reads and writes. Larger devices, grow/shrink updates, prefix hashes and unchanged
-  tails are covered by `ota-client/tests/sizes.rs` (`docs/image-geometry-and-cli.md`).
+  tails are covered by `delta-update-client/tests/sizes.rs` (`docs/image-geometry-and-cli.md`).
 - **Peaks**: the streamed phases stay within their modeled bounds
-  (`ota-client/tests/peak_stream.rs`).
+  (`delta-update-client/tests/peak_stream.rs`).

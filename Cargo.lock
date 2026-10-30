@@ -226,6 +226,59 @@ dependencies = [
 ]
 
 [[package]]
+name = "delta-update-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "delta-update-cli-args",
+ "delta-update-client",
+ "delta-update-generator",
+ "delta-update-payload",
+ "libc",
+]
+
+[[package]]
+name = "delta-update-cli-args"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "delta-update-payload",
+]
+
+[[package]]
+name = "delta-update-client"
+version = "0.1.0"
+dependencies = [
+ "delta-update-generator",
+ "delta-update-payload",
+ "prost",
+]
+
+[[package]]
+name = "delta-update-generator"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "clap",
+ "delta-update-cli-args",
+ "delta-update-payload",
+ "libc",
+ "miniz_oxide",
+ "prost",
+]
+
+[[package]]
+name = "delta-update-payload"
+version = "0.1.0"
+dependencies = [
+ "miniz_oxide",
+ "prost",
+ "prost-build",
+ "rsa",
+ "sha2 0.11.1",
+]
+
+[[package]]
 name = "der"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -483,59 +536,6 @@ name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
-
-[[package]]
-name = "ota-cli"
-version = "0.1.0"
-dependencies = [
- "clap",
- "libc",
- "ota-cli-args",
- "ota-client",
- "ota-generator",
- "ota-payload",
-]
-
-[[package]]
-name = "ota-cli-args"
-version = "0.1.0"
-dependencies = [
- "clap",
- "ota-payload",
-]
-
-[[package]]
-name = "ota-client"
-version = "0.1.0"
-dependencies = [
- "ota-generator",
- "ota-payload",
- "prost",
-]
-
-[[package]]
-name = "ota-generator"
-version = "0.1.0"
-dependencies = [
- "ash",
- "clap",
- "libc",
- "miniz_oxide",
- "ota-cli-args",
- "ota-payload",
- "prost",
-]
-
-[[package]]
-name = "ota-payload"
-version = "0.1.0"
-dependencies = [
- "miniz_oxide",
- "prost",
- "prost-build",
- "rsa",
- "sha2 0.11.1",
-]
 
 [[package]]
 name = "pem-rfc7468"

@@ -3,7 +3,7 @@
 A Rust implementation of the A/B byte-range update flow: generate a signed delta
 between two partition images, then verify and apply it to byte-addressed storage,
 resumably, one operation at a time. The protobuf schema is vendored into
-`ota-payload/schema/`; the project does not require an `update_engine/` source tree.
+`delta-update-payload/schema/`; the project does not require an `update_engine/` source tree.
 
 ## Scope
 
@@ -21,15 +21,15 @@ See `docs/` for the format, client, generator and platform designs.
 
 | Crate | Role | Environment |
 | --- | --- | --- |
-| `ota-payload` | resource profile (`profile`), bounded pre-decode scan (`prescan`), framing (`layout`), prost manifest messages (`manifest`, `schema`), metadata policy (`plan`), signatures (`verify`, `sign`), SHA-256, RSA | `no_std` + `alloc` |
-| `ota-generator` | host-side delta generator: a genetic search over byte-range programs on a Vulkan compute device, scored by exact uncompressed payload size, followed by a CPU pass that chooses frame, sparse and compression encodings; the full-image builder (`full`), which needs no old image and no device; the `builder` for hand-shaped operation lists; and the `ota-gen` binary | `std` |
-| `ota-client` | apply middleware: `prepare` then `apply`, in a buffered variant (`apply`) and a streaming one (`stream`, `source`), both driven by one resumable engine (`engine`) that commits each operation through a checkpoint (`checkpoint`), with the read-only old image (`image`) that copies read | `no_std` |
-| `ota-cli` | reference host bindings (file- and RAM-backed devices, read-only file old image, file payload `Source`, file checkpoint store) + the `ota-apply` binary | `std` |
-| `ota-cli-args` | shared clap parsing and all 12 explicit resource-limit arguments for `ota-gen` and `ota-apply` | `std` only |
+| `delta-update-payload` | resource profile (`profile`), bounded pre-decode scan (`prescan`), framing (`layout`), prost manifest messages (`manifest`, `schema`), metadata policy (`plan`), signatures (`verify`, `sign`), SHA-256, RSA | `no_std` + `alloc` |
+| `delta-update-generator` | host-side delta generator: a genetic search over byte-range programs on a Vulkan compute device, scored by exact uncompressed payload size, followed by a CPU pass that chooses frame, sparse and compression encodings; the full-image builder (`full`), which needs no old image and no device; the `builder` for hand-shaped operation lists; and the `ota-gen` binary | `std` |
+| `delta-update-client` | apply middleware: `prepare` then `apply`, in a buffered variant (`apply`) and a streaming one (`stream`, `source`), both driven by one resumable engine (`engine`) that commits each operation through a checkpoint (`checkpoint`), with the read-only old image (`image`) that copies read | `no_std` |
+| `delta-update-cli` | reference host bindings (file- and RAM-backed devices, read-only file old image, file payload `Source`, file checkpoint store) + the `ota-apply` binary | `std` |
+| `delta-update-cli-args` | shared clap parsing and all 12 explicit resource-limit arguments for `ota-gen` and `ota-apply` | `std` only |
 
 The generator and client share format policy and resource admission through
-`ota-payload`. Both host binaries also use `ota-cli-args`; clap stays outside
-`ota-payload` and `ota-client`, preserving their `no_std` boundary.
+`delta-update-payload`. Both host binaries also use `delta-update-cli-args`; clap stays outside
+`delta-update-payload` and `delta-update-client`, preserving their `no_std` boundary.
 
 ## Pipeline
 
@@ -88,13 +88,13 @@ and validates the metadata. See `docs/client.md` and `docs/checkpoint.md`.
 | payload Signatures message            (offset/size recorded in manifest)
 ```
 
-The 24-byte header length is `ota-payload::layout::HEADER_SIZE`, named so the
+The 24-byte header length is `delta_update_payload::layout::HEADER_SIZE`, named so the
 emitter and the parser cannot disagree about where the manifest starts.
 
 ## Resource profile
 
 Every metadata size and count limit is supplied through one `ResourceProfile`
-in `ota-payload::profile`. These are admission limits under a documented allocator
+in `delta_update_payload::profile`. These are admission limits under a documented allocator
 model, not a guarantee of total process or device RAM. Both CLIs expose every field independently:
 
 | CLI option / library field (hyphens become underscores) | Meaning | CLI default = `EMBEDDED` | `HOST` library preset |
@@ -180,7 +180,7 @@ See `docs/full-image.md`.
 
 Apply it with a public key to verify both signatures. Signatures are skipped only
 when `--development` is supplied without `-k`; other integrity checks still run.
-Add `--stream` to pull the payload through `ota_client::source::Source` instead
+Add `--stream` to pull the payload through `delta_update_client::source::Source` instead
 of reading it into memory. Only the metadata region is held before the device
 is opened. Without `--stream` the whole payload is read into memory, and that read is
 bounded by `--max-buffered-payload` (default 67108864 bytes, 64 MiB). A larger payload is
@@ -262,7 +262,7 @@ update in progress with that earlier tool before switching. See
 `docs/checkpoint.md` §5.1.
 
 Both tools exit `1` on a payload or device error and `2` on a usage error. The
-error vocabulary is `ota_payload::error::Code`, deliberately snake_case to
+error vocabulary is `delta_update_payload::error::Code`, deliberately snake_case to
 mirror the reference's `ErrorCode`.
 
 ## Apply: two phases, two pipelines
@@ -306,38 +306,38 @@ The devcontainer supplies these prerequisites.
 ```sh
 cargo build --workspace
 cargo test --workspace      # bench_report is ignored by default
-cargo check -p ota-client --target riscv32imac-unknown-none-elf
+cargo check -p delta-update-client --target riscv32imac-unknown-none-elf
 ```
 
 The suites, by what they pin:
 
-- **Regressions** (`ota-client/tests/regressions.rs`, `ota-cli/tests/cli.rs`):
+- **Regressions** (`delta-update-client/tests/regressions.rs`, `delta-update-cli/tests/cli.rs`):
   late policy rejection with zero writes, extent overflow, missing operation
   type, malformed hash lengths, a device too small for its update, trailing bytes,
   and memory-limited malformed input on both CLI paths. The scanner's unit tests pin
   duplicate singular fields, which are refused, against repeated fields, which are
   accepted.
-- **Independent image geometry and CLI policy** (`ota-client/tests/sizes.rs`,
-  `ota-generator/tests/sizes.rs`, `ota-cli/tests/args.rs`, `ota-generator/tests/cli.rs`,
-  `ota-cli-args/src/lib.rs`): growth/shrinkage, independent source bounds, unknown
+- **Independent image geometry and CLI policy** (`delta-update-client/tests/sizes.rs`,
+  `delta-update-generator/tests/sizes.rs`, `delta-update-cli/tests/args.rs`, `delta-update-generator/tests/cli.rs`,
+  `delta-update-cli-args/src/lib.rs`): growth/shrinkage, independent source bounds, unknown
   growth bytes, prefix hashes, unchanged tails, explicit caps, help/version and
   usage/runtime exit codes. See `docs/image-geometry-and-cli.md` for evidence.
-- **Byte ranges** (`ota-client/tests/ranges.rs`): unaligned, short, large and
+- **Byte ranges** (`delta-update-client/tests/ranges.rs`): unaligned, short, large and
   out-of-order destinations, and overlapping operations, whose later writes win.
   Each is compared with the byte-array model on both pipelines.
-- **In-target copies** (`ota-client/tests/target_copy.rs`): copies that read the
+- **In-target copies** (`delta-update-client/tests/target_copy.rs`): copies that read the
   target they write, their refusals (self-overlap, cycles, a write-only sink, a
   source hash that does not match), and a copy of what an earlier operation wrote.
-- **Resume and failure injection** (`ota-client/tests/resume.rs`, `model.rs`): an
+- **Resume and failure injection** (`delta-update-client/tests/resume.rs`, `model.rs`): an
   update cut at every write, every flush and every checkpoint replacement resumes to
   the target. Random programs of every operation kind are interrupted and resumed on
   both pipelines and compared with the byte-array model
-  (`ota-client/tests/support/model.rs`). A damaged checkpoint, another payload's
+  (`delta-update-client/tests/support/model.rs`). A damaged checkpoint, another payload's
   checkpoint, another target and a stale device are each refused with no write. A
   completed update run again writes nothing, and a target altered since completion
   is refused with `hash_mismatch`. A resume at the final verification checks the
   payload signature over the restored hash state, on the streamed path.
-- **Target scale** (`ota-client/tests/target_scale.rs`, generator unit tests):
+- **Target scale** (`delta-update-client/tests/target_scale.rs`, generator unit tests):
   16 MiB of 4 KiB blocks in six patterns, each fitting the embedded profile and
   round-tripping through both pipelines. The project pattern carries copies and
   frames or sparse spans, and is resumed from an interruption. `bench_report`
@@ -347,7 +347,7 @@ The suites, by what they pin:
   (`sparse.rs`), copies from the old image with its refusals (`copy.rs`), and the
   command-line refusals of a source that is the device (`cli.rs`). Each asserts its
   exact error code, and a malformed frame or map is refused before any write.
-- **Peak memory** (`ota-client/tests/peak_memory.rs`, `peak_stream.rs`): every
+- **Peak memory** (`delta-update-client/tests/peak_memory.rs`, `peak_stream.rs`): every
   count-valid manifest shape at each growth boundary, the largest manifest the
   budget admits, signature shapes at the encoded limit, the RSA workspace measured
   alone, and the streamed pipeline in each phase against its estimate. A completed
@@ -355,13 +355,13 @@ The suites, by what they pin:
   signature buffers (`peak_completed.rs`). They are measured with a simulated
   allocator, and each is checked against its model. See `docs/memory.md` for the
   numbers and what they do not show.
-- **Full-image payloads** (`ota-generator/tests/full.rs`, `cli.rs`, `ota-client/tests/full.rs`,
-  `ota-cli/tests/cli.rs`): every image shape built and checked; the frame-table split and the
+- **Full-image payloads** (`delta-update-generator/tests/full.rs`, `cli.rs`, `delta-update-client/tests/full.rs`,
+  `delta-update-cli/tests/cli.rs`): every image shape built and checked; the frame-table split and the
   fallback to raw; the full checker's refusals on signed payloads; `ota-gen --full` and its
   refusals; a full payload applied to zeros, erased flash and unrelated contents through both
   pipelines with no old image; and interrupted runs resumed at every write, flush and checkpoint.
   `docs/full-image.md` has the design and the measured sizes.
-- **The GPU search** (`ota-generator/tests/gpu_eval.rs`, `gpu_search.rs`, `src/verification.rs`,
+- **The GPU search** (`delta-update-generator/tests/gpu_eval.rs`, `gpu_search.rs`, `src/verification.rs`,
   `src/compress.rs`): the device's replay, repair and exact size against the CPU's, on random,
   boundary and capacity cases; every operator bred alone from a known parent; determinism, including
   independence from batching and from the device; one upload and small readbacks; the encoding pass.

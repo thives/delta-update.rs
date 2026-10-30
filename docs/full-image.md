@@ -10,8 +10,8 @@ untouched or kept destination bytes (`docs/image-geometry-and-cli.md`).
 The format is unchanged. A full-image payload is an ordinary revision-17 payload that omits
 `old_partition_info`, uses three existing operations, and covers the partition in order. The client
 applies it with the pipelines it already has, and no client code path is added for it. What is new is
-the generator's full form (`ota_generator::build_full_payload`, `ota-gen --full`), the checker's full
-rules (`ota_generator::check::check_full_payload`), and the tests that hold both to the client's behaviour.
+the generator's full form (`delta_update_generator::build_full_payload`, `ota-gen --full`), the checker's full
+rules (`delta_update_generator::check::check_full_payload`), and the tests that hold both to the client's behaviour.
 
 This document covers the design, why each part is shaped as it is, what it costs, and what it does not
 do. The normative rules are in `docs/format.md` §12 and `docs/client.md` §2.6; the generator's own
@@ -240,7 +240,7 @@ Only the coverage rule refuses it, with `partition_mismatch`.
 
 The checker also refuses, with the code named in `docs/format.md` §12, a payload that records an old
 partition, uses a copy or a sparse operation, has an overlap, writes out of order, or carries a wrong
-size or hash. Each is a test in `ota-generator/tests/full.rs`, with a payload signed under the test key,
+size or hash. Each is a test in `delta-update-generator/tests/full.rs`, with a payload signed under the test key,
 so the refusal comes from the rule and not from a bad signature.
 
 ## 5. The client
@@ -341,16 +341,16 @@ includes the checker's three replays. The time was measured once, on the sandbox
 
 The counts below describe the original full-image test snapshot, not the current
 workspace total. Current growth/shrinkage and larger-device coverage is also in
-`ota-client/tests/sizes.rs`; CLI parsing/cap coverage is in `ota-cli/tests/args.rs`
-and the expanded `ota-generator/tests/cli.rs`.
+`delta-update-client/tests/sizes.rs`; CLI parsing/cap coverage is in `delta-update-cli/tests/args.rs`
+and the expanded `delta-update-generator/tests/cli.rs`.
 
 | Test | What it establishes |
 | --- | --- |
-| `ota-generator/tests/full.rs` (29 tests) | metadata and coverage of every image shape; determinism; zero, compressible, random, mixed, tiny, empty and partial-chunk images; frame-table splitting; the framed-to-raw fallback, at one-byte blocks and at the operation and extent limits; no-candidate resource errors; a 16 MiB image under the embedded profile; key-size signature slots; each checker refusal, with signed payloads |
-| `ota-generator/tests/cli.rs` (7 tests) | `ota-gen --full` success and its options; the exact argument count; each search-only option refused with no output; the unchanged delta form; the 1 MiB alternating image at `-b 1` under a 192 MiB limit |
-| `ota-client/tests/full.rs` (10 tests) | every image shape applied from zeros, erased flash and unrelated contents, on the buffered and streamed pipelines and a write-only sink; an undersized device refused with zero writes; a damaged frame table refused before any write, and a corrupt raw block refused after its writes on the streamed path, at their documented boundaries; a cut at every write, flush and checkpoint resumes to the image; a completed update rerun writes nothing and refuses an altered target |
-| `ota-cli/tests/cli.rs` (one new test) | `ota-apply` applies a full payload with no `-s`, on the buffered and streamed paths, to a device of unrelated contents |
-| `ota-generator/src/full.rs` unit tests (8) | the lazy run decomposition; each count limit at its value and one past it; a framed candidate at the operation limit, and a zero run, a data run or a frame-table split past it; a refused candidate drawing no run past the one that refuses it; the frame-table budget closing an operation |
+| `delta-update-generator/tests/full.rs` (29 tests) | metadata and coverage of every image shape; determinism; zero, compressible, random, mixed, tiny, empty and partial-chunk images; frame-table splitting; the framed-to-raw fallback, at one-byte blocks and at the operation and extent limits; no-candidate resource errors; a 16 MiB image under the embedded profile; key-size signature slots; each checker refusal, with signed payloads |
+| `delta-update-generator/tests/cli.rs` (7 tests) | `ota-gen --full` success and its options; the exact argument count; each search-only option refused with no output; the unchanged delta form; the 1 MiB alternating image at `-b 1` under a 192 MiB limit |
+| `delta-update-client/tests/full.rs` (10 tests) | every image shape applied from zeros, erased flash and unrelated contents, on the buffered and streamed pipelines and a write-only sink; an undersized device refused with zero writes; a damaged frame table refused before any write, and a corrupt raw block refused after its writes on the streamed path, at their documented boundaries; a cut at every write, flush and checkpoint resumes to the image; a completed update rerun writes nothing and refuses an altered target |
+| `delta-update-cli/tests/cli.rs` (one new test) | `ota-apply` applies a full payload with no `-s`, on the buffered and streamed paths, to a device of unrelated contents |
+| `delta-update-generator/src/full.rs` unit tests (8) | the lazy run decomposition; each count limit at its value and one past it; a framed candidate at the operation limit, and a zero run, a data run or a frame-table split past it; a refused candidate drawing no run past the one that refuses it; the frame-table budget closing an operation |
 
 The original full-image change passed the workspace suite with these tests included.
 For focused validation of the geometry/CLI changes, see `docs/image-geometry-and-cli.md` §7.
@@ -373,14 +373,14 @@ For focused validation of the geometry/CLI changes, see `docs/image-geometry-and
 
 | File | Change |
 | --- | --- |
-| `ota-generator/src/full.rs` | new: the two candidates, admission and choice, and the build |
-| `ota-generator/src/check.rs` | the verification prefix shared by both checkers; `check_full_payload` and its rules |
-| `ota-generator/src/lib.rs` | `build_full_payload`; the name and block-size checks shared with the delta API; the manifest builder takes an optional old partition |
-| `ota-generator/src/evaluate.rs` | `admitted_size`, the admission arithmetic shared with the delta search; the signature-slot check made crate-visible |
-| `ota-generator/src/mapper.rs` | `stored_frame`, the zlib-or-raw rule shared with the delta mapper; the wire helper made crate-visible |
-| `ota-generator/src/main.rs` | `--full`, its refusals of the search-only options, and its report |
-| `ota-generator/tests/full.rs`, `cli.rs` | new tests (§8) |
-| `ota-client/tests/full.rs` | new apply, refusal and resume tests (§8) |
-| `ota-cli/tests/cli.rs` | one new binary-level apply test (§8) |
+| `delta-update-generator/src/full.rs` | new: the two candidates, admission and choice, and the build |
+| `delta-update-generator/src/check.rs` | the verification prefix shared by both checkers; `check_full_payload` and its rules |
+| `delta-update-generator/src/lib.rs` | `build_full_payload`; the name and block-size checks shared with the delta API; the manifest builder takes an optional old partition |
+| `delta-update-generator/src/evaluate.rs` | `admitted_size`, the admission arithmetic shared with the delta search; the signature-slot check made crate-visible |
+| `delta-update-generator/src/mapper.rs` | `stored_frame`, the zlib-or-raw rule shared with the delta mapper; the wire helper made crate-visible |
+| `delta-update-generator/src/main.rs` | `--full`, its refusals of the search-only options, and its report |
+| `delta-update-generator/tests/full.rs`, `cli.rs` | new tests (§8) |
+| `delta-update-client/tests/full.rs` | new apply, refusal and resume tests (§8) |
+| `delta-update-cli/tests/cli.rs` | one new binary-level apply test (§8) |
 | `docs/full-image.md` | this document |
 | `docs/format.md` §12, `docs/client.md` §2.6, `docs/generator.md` §17, `README.md` | the normative and reference updates |

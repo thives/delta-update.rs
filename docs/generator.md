@@ -1,6 +1,6 @@
 # OTA delta generator
 
-`ota-generator` is the `std` side of the format. Given old and new partition images whose lengths
+`delta-update-generator` is the `std` side of the format. Given old and new partition images whose lengths
 may differ, it finds a short ordered program of byte-range operations that turns the old image
 into the new one, writes that program as a signed `CrAU` major-2 payload, and checks its own
 output with the verifier and replay the client runs. The format is in `docs/format.md`; this
@@ -222,7 +222,7 @@ exhausted`, so no single candidate can hold up the dispatch it runs in.
 
 ## 5. Admission and exact fitness
 
-A [`Mapping`](../ota-generator/src/mapper.rs) is the immutable context of one partition
+A [`Mapping`](../delta-update-generator/src/mapper.rs) is the immutable context of one partition
 update: its two images, its codec chunk size, and the compressed frames of those images. Its
 frame cache is private to it, so a frame can only be reused for the images it was made from.
 It is the **CPU's reference and admission machinery**: the encoding pass, the final assembly and
@@ -346,14 +346,14 @@ operations, well inside its 64-operation limit, so a search that counted only op
 spend its generations on programs the CPU refuses. The test
 `the_decode_memory_budget_of_the_embedded_profile_is_modeled_on_the_device` checks that the device
 stops at exactly the operation count where the CPU's scanner does. The workspace has its own boundary
-tests in `ota-generator/tests/gpu_eval.rs`: a program whose workspace is its largest transient is
+tests in `delta-update-generator/tests/gpu_eval.rs`: a program whose workspace is its largest transient is
 checked one byte either side of its charge, on the device and on the CPU.
 
 ## 6. The GPU session
 
 The generator uses Vulkan compute, through `ash`. The search is a set of compute stages written in
-GLSL under `ota-generator/shaders/` and compiled to SPIR-V by `build.rs` with `glslc`. A
-[`Session`](../ota-generator/src/gpu.rs) owns everything the search needs on the device, from the
+GLSL under `delta-update-generator/shaders/` and compiled to SPIR-V by `build.rs` with `glslc`. A
+[`Session`](../delta-update-generator/src/gpu.rs) owns everything the search needs on the device, from the
 upload of the images to the readback of the finalists.
 
 ```mermaid
@@ -762,7 +762,7 @@ that is starved by a capacity says so instead of silently searching a smaller sp
 
 ## 8. Control, deadlines and progress
 
-A single [`Control`](../ota-generator/src/control.rs) owns the clock, the deadline, the generation cap,
+A single [`Control`](../delta-update-generator/src/control.rs) owns the clock, the deadline, the generation cap,
 the progress history, and the reason the search stopped. The host consults it **once per batch**,
 before the batch is submitted. A step the deadline cuts short returns `Halt::Deadline` and no result,
 so an interrupted step can never be mistaken for a finished one.
@@ -845,7 +845,7 @@ and self-check, and the last two are not counted against the limit.
 
 ### 9.1 The encoding pass
 
-[`compress.rs`](../ota-generator/src/compress.rs) runs on the CPU after the search. The device's
+[`compress.rs`](../delta-update-generator/src/compress.rs) runs on the CPU after the search. The device's
 programs are raw, and its best raw program is not necessarily the one that compresses best, so the pass
 considers several:
 
@@ -1006,7 +1006,7 @@ ota-gen --full [-b block-size] [-n partition-name] [--max-... value]...
 
 ## 11. Tests
 
-Run with `cargo test -p ota-generator`. The device-backed tests run on the software device, which
+Run with `cargo test -p delta-update-generator`. The device-backed tests run on the software device, which
 needs `mesa-vulkan-drivers`; `OTA_TEST_DEVICE=auto` runs the same tests on the hardware device first.
 **Both must pass**, since a driver can disagree with the software device (§6.7). The suite is grouped by
 what each part guards. Independent image-size coverage is in `tests/sizes.rs`; command-line parsing
@@ -1104,7 +1104,7 @@ here, while a change in how fast it writes does not.
 on failure (a failure is injected, not a broken driver), software-only selection, the memory-type
 preference, the table shapes, and the chromosome round trip.
 
-**The client** (`ota-client`, `ota-cli`): payloads the search produces are applied through the client,
+**The client** (`delta-update-client`, `delta-update-cli`): payloads the search produces are applied through the client,
 buffered and streamed, including interrupted and resumed runs. Two sparse-replacement tests that need
 one raw replacement build it with the `builder` instead of asking the search for it, since the search
 may now find a smaller plan.
@@ -1376,7 +1376,7 @@ To measure on a device:
 
 ```sh
 OTA_BENCH_OLD=old.img OTA_BENCH_NEW=new.img OTA_BENCH_WARMUP=100 OTA_TEST_DEVICE=auto \
-    cargo test --release -p ota-generator --test bench -- --ignored --nocapture
+    cargo test --release -p delta-update-generator --test bench -- --ignored --nocapture
 ```
 
 reports the upload, the first population, the mean and worst time of each stage over twelve generations
@@ -1387,7 +1387,7 @@ software device's shader cache, so a comparison should say which.
 
 ## 17. Full-image generation
 
-`ota-gen --full` and `ota_generator::build_full_payload` build a payload that records only the new
+`ota-gen --full` and `delta_update_generator::build_full_payload` build a payload that records only the new
 image. The design, the contract and the measurements are in `docs/full-image.md`; this section is the
 generator's side of it.
 
@@ -1577,7 +1577,7 @@ counters added, which change nothing).
 
 ```sh
 OTA_MATRIX_SEEDS=1,2 OTA_MATRIX_GENERATIONS=20 OTA_TEST_DEVICE=auto \
-    cargo test --release -p ota-generator --test bench workload_matrix -- --ignored --nocapture
+    cargo test --release -p delta-update-generator --test bench workload_matrix -- --ignored --nocapture
 ```
 
 **Equality.** All 36 builds have the same payload length and digest before and after, and the same trial
@@ -1862,11 +1862,11 @@ first). Disabling the check every 64 extents fails both mid-chunk tests.
 
 ### 19.4 Validation
 
-**Tests.** All pass on both devices. `cargo test --release -p ota-generator` on the software device, and the
+**Tests.** All pass on both devices. `cargo test --release -p delta-update-generator` on the software device, and the
 same with `OTA_TEST_DEVICE=auto` on the Intel device, each give 109 library tests (two ignored) and the
 integration suites: `cli` 14, `full` 29, `gpu_eval` 16, `gpu_search` 22, `regressions` 20, `search` 11 and
 `sizes` 4. The library suite also passes in a debug build, so the checked arithmetic has no overflow panic.
-`cargo test --workspace --release` passes in every crate, which includes `ota-payload`, `ota-client` and the
+`cargo test --workspace --release` passes in every crate, which includes `delta-update-payload`, `delta-update-client` and the
 command-line crates. `git diff --check` is clean.
 
 **Regression fixtures.** Each fix has the fixture its test names, and the mutation checks were run on the
@@ -2095,7 +2095,7 @@ short-extent pairs were 0.146 s and 0.144 s, 0.153 s and 0.210 s, and 0.226 s an
 round-to-round spread is larger than the differences. The change is not measured to be slower, and no speed-up is
 claimed either.
 
-**Suites.** `cargo test --release -p ota-generator` passes on the software device, and with `OTA_TEST_DEVICE=auto` on
+**Suites.** `cargo test --release -p delta-update-generator` passes on the software device, and with `OTA_TEST_DEVICE=auto` on
 the Intel device. The library suite has 118 tests (two ignored), which is the 109 of §19.4 plus nine new ones. Each
 integration suite has the same count as before.
 
@@ -2227,12 +2227,12 @@ workspace are each one lower than the tree now has.
 | --- | --- |
 | Removed `src/full.rs` `a_framed_candidate_at_the_operation_limit_remains_eligible` | `a_candidate_that_covers_the_image_at_the_limit_reads_no_further_run` builds the same four runs at the same limit and asserts the same four operations. It also counts the runs drawn. |
 | Removed `tests/cli.rs` `the_delta_form_still_takes_exactly_four_positional_arguments` | `missing_arguments_unknown_flags_and_removed_profiles_are_usage_errors` refuses the same three-positional delta form, and checks the usage text, the `--help` hint and empty stdout. The standalone test checked fewer of those. |
-| Removed two buffered corruption cases from `ota-client/tests/full.rs` | `apply.rs` `verified_tampering_is_rejected_before_any_write` and `unverified_blob_tampering_is_caught_by_its_hash_before_any_write` assert the same refusal codes and zero writes. Their input is a searched delta, not a full image. The checks they reach, `verify_payload` and `verify_blobs`, do not branch on operation type, so the frame case is not a separate path. |
+| Removed two buffered corruption cases from `delta-update-client/tests/full.rs` | `apply.rs` `verified_tampering_is_rejected_before_any_write` and `unverified_blob_tampering_is_caught_by_its_hash_before_any_write` assert the same refusal codes and zero writes. Their input is a searched delta, not a full image. The checks they reach, `verify_payload` and `verify_blobs`, do not branch on operation type, so the frame case is not a separate path. |
 | `gpu_eval.rs`: `assert_agree` returns the device's results | Once agreement holds, `size.is_some()` is the CPU's verdict. `fuzz`, the decode-budget test and the wide-extent test count from the returned results, and three tests read the returned results where they re-evaluated the same programs. Each re-evaluation and each separate CPU pass is gone. |
 | `compress.rs`: budget zero removed from the budget list | Budget zero is the `slow` reference pass the test compares every budget with. Budget one still refuses the analysis of any candidate with a data operation, because that analysis always holds more than one byte, so the refused-analysis path is covered. |
 
 Four tests were rewritten rather than deleted, because they asserted less than their names claimed.
-All four are in `ota-client`. They are listed here so that the whole test-surface change is in one place.
+All four are in `delta-update-client`. They are listed here so that the whole test-surface change is in one place.
 
 - `sparse.rs`: two handcrafted raw replacements (65 spans of 4,096 blocks, and 65,536 one-byte
   blocks) became one 64-byte raw replacement at one-byte blocks, with zero and nonzero bytes. The
@@ -2263,14 +2263,14 @@ Every check below ran on the tree that is committed, with the software device un
 
 - `cargo test --workspace --no-fail-fast`: exit 0, no warnings. The total is 502 passed and 7 ignored,
   against 507 and 7 at HEAD. Four binaries changed their counts, and each change is a deletion or a
-  replacement from §21.4: `ota-client` `full` 12 to 10, `sparse` 12 to 11, and `ota-generator` library
+  replacement from §21.4: `delta-update-client` `full` 12 to 10, `sparse` 12 to 11, and `delta-update-generator` library
   119 to 117 and `cli` 14 to 13. `peak_completed` is new, with one test. Every other binary has the count
   it had.
-- `OTA_TEST_DEVICE=auto cargo test -p ota-generator --no-fail-fast`: exit 0, on the Intel iGPU.
-- `cargo check -p ota-client --target riscv32imac-unknown-none-elf`: passes.
-- `cargo test --release -p ota-client --test peak_memory --test peak_stream --test peak_completed`: passes.
+- `OTA_TEST_DEVICE=auto cargo test -p delta-update-generator --no-fail-fast`: exit 0, on the Intel iGPU.
+- `cargo check -p delta-update-client --target riscv32imac-unknown-none-elf`: passes.
+- `cargo test --release -p delta-update-client --test peak_memory --test peak_stream --test peak_completed`: passes.
   The peak figures are in `docs/memory.md` §5.7.
-- Workload matrix (`ota-generator/tests/bench.rs`, `workload_matrix`, 9 workloads under both
+- Workload matrix (`delta-update-generator/tests/bench.rs`, `workload_matrix`, 9 workloads under both
   profiles, 18 builds): HEAD and this change were run in one session. The matrix exercises only the
   generator, which the last client edit does not touch. Digests, payload sizes, raw
   fitness, generations, evaluated and trial counts, whole-program replays, device bytes and
@@ -2290,7 +2290,7 @@ it, and renames it over the output. The output must not be the same file as an i
 by device and inode, so a symlink or a hard link to the old image, the new image or
 the key is refused before anything is written. A failed write leaves the existing
 output as it was, and the temporary file is removed. A replaced output is always
-complete: it is never part old and part new (`ota-generator/tests/output.rs`).
+complete: it is never part old and part new (`delta-update-generator/tests/output.rs`).
 
 **Output permissions.** Every output is `0600`, whether it is new or replaces an existing file, and whatever
 the umask (`NEW_OUTPUT_MODE`). The temporary file is created exclusively, and its mode is set to `0600`
@@ -2298,8 +2298,8 @@ before the first payload byte is written, before it is synced, and before it is 
 not keep the old file's mode, so a `0644` output that is replaced becomes `0600`, and an operator who needs
 other access sets it after generation (§9.4). A symbolic link at the output is replaced by the private file,
 and its target keeps its own mode. If setting the mode fails, the output is untouched and the temporary file is
-removed, like any other failure before the rename (`ota-generator/src/main.rs`, and
-`ota-generator/tests/output.rs`).
+removed, like any other failure before the rename (`delta-update-generator/src/main.rs`, and
+`delta-update-generator/tests/output.rs`).
 
 **Release version.** `--release-version N` (default 0) sets the signed release counter
 of the payload. Both delta and `--full` payloads record it, and the search's sizing
