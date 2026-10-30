@@ -1,3 +1,7 @@
+[![Crates.io](https://img.shields.io/crates/v/delta-update-client)](https://crates.io/crates/delta-update-client)
+[![docs.rs](https://img.shields.io/docsrs/delta-update-client)](https://docs.rs/delta-update-client)
+[![ci](https://github.com/thives/delta-update.rs/actions/workflows/ci.yml/badge.svg)](https://github.com/thives/delta-update.rs/actions/workflows/ci.yml)
+
 # Rust OTA delta update engine
 
 A Rust implementation of the A/B byte-range update flow: generate a signed delta
