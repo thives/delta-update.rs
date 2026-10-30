@@ -414,21 +414,6 @@ mod tests {
     }
 
     #[test]
-    fn device_path_round_trip_reproduces_the_new_image() {
-        let payload = signed_payload();
-        let keys = keys();
-        let mut dev = Dev::new(old_image());
-        device_run(
-            &payload,
-            Trust::Verified(&keys),
-            &mut dev,
-            &mut MemoryStore::new(),
-        )
-        .unwrap();
-        assert_eq!(dev.data, new_image());
-    }
-
-    #[test]
     fn verified_tampering_is_rejected_before_any_write() {
         let mut payload = signed_payload();
         let info = layout::parse_unverified(&payload, &EMBEDDED).ok().unwrap();

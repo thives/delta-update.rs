@@ -241,7 +241,10 @@ pub enum Mode {
 /// The error for a chunk the map does not cover. A validated operation never
 /// reaches it, so replay uses it as a guard rather than a path.
 pub fn map_does_not_cover() -> PayloadError {
-    return err(Code::block_map_invalid, "block map does not cover the operation");
+    return err(
+        Code::block_map_invalid,
+        "block map does not cover the operation",
+    );
 }
 
 /// Bytes a two-bit chunk map needs for `chunks` chunks, or `None` on overflow.
@@ -279,7 +282,10 @@ pub fn split_sparse(packed: &[u8], blocks: u64) -> Result<(&[u8], &[u8]), Payloa
         Ok(v) => v,
     };
     if cut > packed.len() {
-        return Err(err(Code::block_map_invalid, "packed data is shorter than the block map"));
+        return Err(err(
+            Code::block_map_invalid,
+            "packed data is shorter than the block map",
+        ));
     }
     return Ok((&packed[..cut], &packed[cut..]));
 }
@@ -329,7 +335,10 @@ pub fn sparse_blob_len(packed: &[u8], total: u64, chunk: u64) -> Result<u64, Pay
     };
     let rest = chunks % 4;
     if rest != 0 && (map[map.len() - 1] >> (2 * rest)) != 0 {
-        return Err(err(Code::block_map_invalid, "unused bits of the chunk map are set"));
+        return Err(err(
+            Code::block_map_invalid,
+            "unused bits of the chunk map are set",
+        ));
     }
     let mut entries = Varints::new(table);
     let mut sum: u64 = 0;
@@ -422,20 +431,18 @@ mod tests {
     }
 
     #[test]
-    fn round_trips_compressible_and_incompressible_blocks() {
+    fn round_trips_compressible_and_incompressible_blocks_without_expanding_noise() {
         let zeros = vec![0u8; BS];
         let text: Vec<u8> = (0..BS).map(|i| b"update engine "[i % 14]).collect();
-        let random = noise(BS, 0x9e37_79b9);
-        for block in [&zeros, &text, &random] {
+        let noise_blocks = [noise(BS, 0x9e37_79b9), noise(BS, 7)];
+        for block in [&zeros, &text, &noise_blocks[0], &noise_blocks[1]] {
             let frame = frame_of(block);
             assert_eq!(decode(&frame, BS).unwrap(), *block);
         }
         assert!(frame_of(&zeros).len() < 64);
-    }
-
-    #[test]
-    fn incompressible_block_frame_is_not_smaller_than_raw() {
-        assert!(frame_of(&noise(BS, 7)).len() >= BS);
+        for block in &noise_blocks {
+            assert!(frame_of(block).len() >= BS);
+        }
     }
 
     #[test]
@@ -527,15 +534,30 @@ mod tests {
 
     #[test]
     fn non_canonical_truncated_and_overlong_varints_are_refused() {
-        assert_eq!(varint_values(&[0x80, 0x00]).err(), Some(Code::frame_table_invalid));
-        assert_eq!(varint_values(&[0x80, 0x80, 0x00]).err(), Some(Code::frame_table_invalid));
-        assert_eq!(varint_values(&[0x80]).err(), Some(Code::frame_table_invalid));
+        assert_eq!(
+            varint_values(&[0x80, 0x00]).err(),
+            Some(Code::frame_table_invalid)
+        );
+        assert_eq!(
+            varint_values(&[0x80, 0x80, 0x00]).err(),
+            Some(Code::frame_table_invalid)
+        );
+        assert_eq!(
+            varint_values(&[0x80]).err(),
+            Some(Code::frame_table_invalid)
+        );
         let mut eleven = [0xffu8; 11];
         eleven[10] = 0x01;
-        assert_eq!(varint_values(&eleven).err(), Some(Code::frame_table_invalid));
+        assert_eq!(
+            varint_values(&eleven).err(),
+            Some(Code::frame_table_invalid)
+        );
         let mut overflow = [0xffu8; 10];
         overflow[9] = 0x02;
-        assert_eq!(varint_values(&overflow).err(), Some(Code::frame_table_invalid));
+        assert_eq!(
+            varint_values(&overflow).err(),
+            Some(Code::frame_table_invalid)
+        );
         let mut max = [0xffu8; 10];
         max[9] = 0x01;
         assert_eq!(varint_values(&max).unwrap(), alloc::vec![u64::MAX]);
@@ -561,7 +583,10 @@ mod tests {
         let mut raw_tail = Vec::new();
         push_varint(&mut raw_tail, 0);
         push_varint(&mut raw_tail, 0);
-        assert_eq!(frame_table_blob_len(&raw_tail, B + 100, B).unwrap(), B + 100);
+        assert_eq!(
+            frame_table_blob_len(&raw_tail, B + 100, B).unwrap(),
+            B + 100
+        );
         assert_eq!(chunk_count(2 * B + 1, B), Some(3));
         assert_eq!(chunk_len(2 * B + 1, B, 2), 1);
         assert_eq!(chunk_count(0, B), Some(0));

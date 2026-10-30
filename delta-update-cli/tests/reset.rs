@@ -143,6 +143,10 @@ impl Case {
     }
 
     fn reset_with(&self, target: &str, extra: &[&str]) -> Output {
+        return self.reset_payload_with(target, &self.payload, extra);
+    }
+
+    fn reset_payload_with(&self, target: &str, payload: &Path, extra: &[&str]) -> Output {
         let mut args = vec![
             "-k",
             PUBLIC_PATH,
@@ -155,9 +159,13 @@ impl Case {
             target,
         ];
         args.extend_from_slice(extra);
-        args.push(Case::path(&self.payload));
+        args.push(Case::path(payload));
         args.push(Case::path(&self.device));
         return run(&args);
+    }
+
+    fn reset_mode(&self, target: &str, streamed: bool) -> Output {
+        return self.reset_with(target, if streamed { &["--stream"] } else { &[] });
     }
 }
 
@@ -166,136 +174,152 @@ fn stderr_of(out: &Output) -> String {
 }
 
 #[test]
-fn a_completed_destination_independent_update_resets_and_the_next_run_applies_again() {
-    let case = Case::new("independent", &full_image(0), &vec![0u8; new_image().len()]);
-    let out = case.apply();
-    assert!(out.status.success(), "{}", stderr_of(&out));
-    assert!(case.checkpoint.exists());
-    fs::write(&case.device, vec![0xa5u8; new_image().len()]).unwrap();
-    let out = case.reset(TARGET_ID);
-    assert!(out.status.success(), "{}", stderr_of(&out));
-    assert!(
-        stderr_of(&out).contains("reset the checkpoint in phase Complete"),
-        "{}",
-        stderr_of(&out)
-    );
-    assert!(!case.checkpoint.exists());
-    let out = case.apply();
-    assert!(out.status.success(), "{}", stderr_of(&out));
-    assert_eq!(fs::read(&case.device).unwrap(), new_image());
-    fs::remove_dir_all(&case.dir).unwrap();
-}
-
-#[test]
-fn a_base_dependent_reset_is_refused_while_the_device_holds_the_new_image_and_keeps_the_checkpoint()
+fn a_completed_destination_independent_update_resets_on_both_paths_and_the_next_run_applies_again()
 {
-    let case = Case::new("refused", &delta(), &old_image());
-    let out = case.apply();
-    assert!(out.status.success(), "{}", stderr_of(&out));
-    assert_eq!(fs::read(&case.device).unwrap(), delta_image());
-    let before = fs::read(&case.checkpoint).unwrap();
-    let out = case.reset(TARGET_ID);
-    assert_eq!(out.status.code(), Some(1));
-    assert!(
-        stderr_of(&out).contains("does not match old partition hash"),
-        "{}",
-        stderr_of(&out)
-    );
-    assert_eq!(fs::read(&case.checkpoint).unwrap(), before);
-    assert_eq!(fs::read(&case.device).unwrap(), delta_image());
-    fs::remove_dir_all(&case.dir).unwrap();
+    for streamed in [false, true] {
+        let case = Case::new(
+            if streamed {
+                "independent-streamed"
+            } else {
+                "independent-buffered"
+            },
+            &full_image(0),
+            &vec![0u8; new_image().len()],
+        );
+        let out = case.apply();
+        assert!(out.status.success(), "{}", stderr_of(&out));
+        assert!(case.checkpoint.exists());
+        let changed = vec![0xa5u8; new_image().len()];
+        fs::write(&case.device, &changed).unwrap();
+        let out = case.reset_mode(TARGET_ID, streamed);
+        assert!(out.status.success(), "{}", stderr_of(&out));
+        assert!(
+            stderr_of(&out).contains("reset the checkpoint in phase Complete"),
+            "{}",
+            stderr_of(&out)
+        );
+        assert!(!case.checkpoint.exists());
+        assert_eq!(fs::read(&case.device).unwrap(), changed);
+        let out = case.apply();
+        assert!(out.status.success(), "{}", stderr_of(&out));
+        assert_eq!(fs::read(&case.device).unwrap(), new_image());
+        fs::remove_dir_all(&case.dir).unwrap();
+    }
 }
 
 #[test]
-fn a_base_dependent_reset_succeeds_once_the_old_image_is_restored_and_the_next_run_starts_over() {
-    let case = Case::new("restored", &delta(), &old_image());
-    let out = case.apply();
-    assert!(out.status.success(), "{}", stderr_of(&out));
-    fs::write(&case.device, old_image()).unwrap();
-    let out = case.reset(TARGET_ID);
-    assert!(out.status.success(), "{}", stderr_of(&out));
-    assert!(!case.checkpoint.exists());
-    assert_eq!(fs::read(&case.device).unwrap(), old_image());
-    let out = case.apply();
-    assert!(out.status.success(), "{}", stderr_of(&out));
-    assert_eq!(fs::read(&case.device).unwrap(), delta_image());
-    fs::remove_dir_all(&case.dir).unwrap();
+fn a_base_dependent_reset_requires_its_old_image_on_both_paths() {
+    for streamed in [false, true] {
+        let case = Case::new(
+            if streamed {
+                "base-streamed"
+            } else {
+                "base-buffered"
+            },
+            &delta(),
+            &old_image(),
+        );
+        let out = case.apply();
+        assert!(out.status.success(), "{}", stderr_of(&out));
+        assert_eq!(fs::read(&case.device).unwrap(), delta_image());
+        let before = fs::read(&case.checkpoint).unwrap();
+        let out = case.reset_mode(TARGET_ID, streamed);
+        assert_eq!(out.status.code(), Some(1), "{}", stderr_of(&out));
+        assert!(
+            stderr_of(&out).contains("does not match old partition hash"),
+            "{}",
+            stderr_of(&out)
+        );
+        assert_eq!(fs::read(&case.checkpoint).unwrap(), before);
+        assert_eq!(fs::read(&case.device).unwrap(), delta_image());
+
+        fs::write(&case.device, old_image()).unwrap();
+        let out = case.reset_mode(TARGET_ID, streamed);
+        assert!(out.status.success(), "{}", stderr_of(&out));
+        assert!(!case.checkpoint.exists());
+        assert_eq!(fs::read(&case.device).unwrap(), old_image());
+        let out = case.apply();
+        assert!(out.status.success(), "{}", stderr_of(&out));
+        assert_eq!(fs::read(&case.device).unwrap(), delta_image());
+        fs::remove_dir_all(&case.dir).unwrap();
+    }
 }
 
 #[test]
-fn a_reset_for_another_target_or_another_payload_is_refused_and_the_checkpoint_is_kept() {
-    let case = Case::new("identity", &full_image(0), &vec![0u8; new_image().len()]);
-    assert!(case.apply().status.success());
-    let before = fs::read(&case.checkpoint).unwrap();
+fn reset_refuses_another_target_or_payload_on_both_paths() {
+    for streamed in [false, true] {
+        let case = Case::new(
+            if streamed {
+                "identity-streamed"
+            } else {
+                "identity-buffered"
+            },
+            &full_image(0),
+            &vec![0u8; new_image().len()],
+        );
+        assert!(case.apply().status.success());
+        let before = fs::read(&case.checkpoint).unwrap();
 
-    let out = case.reset(OTHER_TARGET_ID);
-    assert_eq!(out.status.code(), Some(1));
-    assert!(
-        stderr_of(&out).contains("another payload or target"),
-        "{}",
-        stderr_of(&out)
-    );
-    assert_eq!(fs::read(&case.checkpoint).unwrap(), before);
+        let out = case.reset_mode(OTHER_TARGET_ID, streamed);
+        assert_eq!(out.status.code(), Some(1), "{}", stderr_of(&out));
+        assert!(stderr_of(&out).contains("another payload or target"));
+        assert_eq!(fs::read(&case.checkpoint).unwrap(), before);
 
-    let other = case.dir.join("other.bin");
-    fs::write(&other, full_image(1)).unwrap();
-    let out = run(&[
-        "-k",
-        PUBLIC_PATH,
-        "--lock-dir",
-        Case::path(&case.lock_dir),
-        "--reset-checkpoint",
-        "--checkpoint",
-        Case::path(&case.checkpoint),
-        "--target-id",
-        TARGET_ID,
-        Case::path(&other),
-        Case::path(&case.device),
-    ]);
-    assert_eq!(out.status.code(), Some(1));
-    assert!(
-        stderr_of(&out).contains("another payload or target"),
-        "{}",
-        stderr_of(&out)
-    );
-    assert_eq!(fs::read(&case.checkpoint).unwrap(), before);
-    fs::remove_dir_all(&case.dir).unwrap();
+        let other = case.dir.join("other.bin");
+        fs::write(&other, full_image(1)).unwrap();
+        let stream_args = if streamed { &["--stream"][..] } else { &[] };
+        let out = case.reset_payload_with(TARGET_ID, &other, stream_args);
+        assert_eq!(out.status.code(), Some(1), "{}", stderr_of(&out));
+        assert!(stderr_of(&out).contains("another payload or target"));
+        assert_eq!(fs::read(&case.checkpoint).unwrap(), before);
+        fs::remove_dir_all(&case.dir).unwrap();
+    }
 }
 
 #[test]
-fn a_reset_with_no_checkpoint_says_so_and_changes_nothing() {
-    let case = Case::new("none", &full_image(0), &vec![0x5au8; new_image().len()]);
-    let out = case.reset(TARGET_ID);
-    assert!(out.status.success(), "{}", stderr_of(&out));
-    assert!(
-        stderr_of(&out).contains("no checkpoint to reset"),
-        "{}",
-        stderr_of(&out)
-    );
-    assert!(!case.checkpoint.exists());
-    assert_eq!(
-        fs::read(&case.device).unwrap(),
-        vec![0x5au8; new_image().len()]
-    );
-    fs::remove_dir_all(&case.dir).unwrap();
+fn reset_without_a_checkpoint_succeeds_without_changing_the_device_on_both_paths() {
+    for streamed in [false, true] {
+        let unchanged = vec![0x5au8; new_image().len()];
+        let case = Case::new(
+            if streamed {
+                "none-streamed"
+            } else {
+                "none-buffered"
+            },
+            &full_image(0),
+            &unchanged,
+        );
+        let out = case.reset_mode(TARGET_ID, streamed);
+        assert!(out.status.success(), "{}", stderr_of(&out));
+        assert!(stderr_of(&out).contains("no checkpoint to reset"));
+        assert!(!case.checkpoint.exists());
+        assert_eq!(fs::read(&case.device).unwrap(), unchanged);
+        fs::remove_dir_all(&case.dir).unwrap();
+    }
 }
 
 #[test]
-fn a_reset_is_refused_while_another_process_holds_the_device() {
-    let case = Case::new("held", &full_image(0), &vec![0u8; new_image().len()]);
-    assert!(case.apply().status.success());
-    let before = fs::read(&case.checkpoint).unwrap();
-    let held = hold_device_lock(&case.device, &case.dir);
-    let out = case.reset(TARGET_ID);
-    assert_eq!(out.status.code(), Some(1));
-    assert!(
-        stderr_of(&out).contains("another update holds"),
-        "{}",
-        stderr_of(&out)
-    );
-    assert_eq!(fs::read(&case.checkpoint).unwrap(), before);
-    drop(held);
-    fs::remove_dir_all(&case.dir).unwrap();
+fn reset_is_refused_while_another_process_holds_the_device_on_both_paths() {
+    for streamed in [false, true] {
+        let case = Case::new(
+            if streamed {
+                "held-streamed"
+            } else {
+                "held-buffered"
+            },
+            &full_image(0),
+            &vec![0u8; new_image().len()],
+        );
+        assert!(case.apply().status.success());
+        let before = fs::read(&case.checkpoint).unwrap();
+        let held = hold_device_lock(&case.device, &case.dir);
+        let out = case.reset_mode(TARGET_ID, streamed);
+        assert_eq!(out.status.code(), Some(1), "{}", stderr_of(&out));
+        assert!(stderr_of(&out).contains("another update holds"));
+        assert_eq!(fs::read(&case.checkpoint).unwrap(), before);
+        drop(held);
+        fs::remove_dir_all(&case.dir).unwrap();
+    }
 }
 
 #[test]
@@ -448,123 +472,8 @@ fn a_removal_not_confirmed_durable_fails_the_reset_and_leaves_the_record_absent(
 
 impl Case {
     fn reset_streamed(&self, target: &str) -> Output {
-        return self.reset_with(target, &["--stream"]);
+        return self.reset_mode(target, true);
     }
-}
-
-#[test]
-fn a_streamed_reset_clears_the_checkpoint_writes_nothing_and_the_next_run_applies_again() {
-    let case = Case::new(
-        "streamed-independent",
-        &full_image(0),
-        &vec![0u8; new_image().len()],
-    );
-    assert!(case.apply().status.success());
-    fs::write(&case.device, vec![0xa5u8; new_image().len()]).unwrap();
-    let out = case.reset_streamed(TARGET_ID);
-    assert!(out.status.success(), "{}", stderr_of(&out));
-    assert!(
-        stderr_of(&out).contains("reset the checkpoint in phase Complete"),
-        "{}",
-        stderr_of(&out)
-    );
-    assert!(!case.checkpoint.exists());
-    assert_eq!(
-        fs::read(&case.device).unwrap(),
-        vec![0xa5u8; new_image().len()]
-    );
-    let out = case.apply();
-    assert!(out.status.success(), "{}", stderr_of(&out));
-    assert_eq!(fs::read(&case.device).unwrap(), new_image());
-    fs::remove_dir_all(&case.dir).unwrap();
-}
-
-#[test]
-fn a_streamed_reset_refuses_another_target_or_payload_and_keeps_the_checkpoint() {
-    let case = Case::new(
-        "streamed-identity",
-        &full_image(0),
-        &vec![0u8; new_image().len()],
-    );
-    assert!(case.apply().status.success());
-    let before = fs::read(&case.checkpoint).unwrap();
-    let out = case.reset_streamed(OTHER_TARGET_ID);
-    assert_eq!(out.status.code(), Some(1), "{}", stderr_of(&out));
-    assert!(
-        stderr_of(&out).contains("another payload or target"),
-        "{}",
-        stderr_of(&out)
-    );
-    assert_eq!(fs::read(&case.checkpoint).unwrap(), before);
-    let other = case.dir.join("other.bin");
-    fs::write(&other, full_image(1)).unwrap();
-    let out = run(&[
-        "-k",
-        PUBLIC_PATH,
-        "--lock-dir",
-        Case::path(&case.lock_dir),
-        "--reset-checkpoint",
-        "--stream",
-        "--checkpoint",
-        Case::path(&case.checkpoint),
-        "--target-id",
-        TARGET_ID,
-        Case::path(&other),
-        Case::path(&case.device),
-    ]);
-    assert_eq!(out.status.code(), Some(1), "{}", stderr_of(&out));
-    assert!(
-        stderr_of(&out).contains("another payload or target"),
-        "{}",
-        stderr_of(&out)
-    );
-    assert_eq!(fs::read(&case.checkpoint).unwrap(), before);
-    fs::remove_dir_all(&case.dir).unwrap();
-}
-
-#[test]
-fn a_streamed_base_dependent_reset_is_refused_while_the_device_holds_the_new_image_and_allowed_once_restored()
- {
-    let case = Case::new("streamed-base", &delta(), &old_image());
-    assert!(case.apply().status.success());
-    let before = fs::read(&case.checkpoint).unwrap();
-    let out = case.reset_streamed(TARGET_ID);
-    assert_eq!(out.status.code(), Some(1), "{}", stderr_of(&out));
-    assert!(
-        stderr_of(&out).contains("does not match old partition hash"),
-        "{}",
-        stderr_of(&out)
-    );
-    assert_eq!(fs::read(&case.checkpoint).unwrap(), before);
-    assert_eq!(fs::read(&case.device).unwrap(), delta_image());
-    fs::write(&case.device, old_image()).unwrap();
-    let out = case.reset_streamed(TARGET_ID);
-    assert!(out.status.success(), "{}", stderr_of(&out));
-    assert!(!case.checkpoint.exists());
-    assert_eq!(fs::read(&case.device).unwrap(), old_image());
-    fs::remove_dir_all(&case.dir).unwrap();
-}
-
-#[test]
-fn a_streamed_reset_is_refused_while_another_process_holds_the_device_and_keeps_the_checkpoint() {
-    let case = Case::new(
-        "streamed-held",
-        &full_image(0),
-        &vec![0u8; new_image().len()],
-    );
-    assert!(case.apply().status.success());
-    let before = fs::read(&case.checkpoint).unwrap();
-    let held = hold_device_lock(&case.device, &case.dir);
-    let out = case.reset_streamed(TARGET_ID);
-    assert_eq!(out.status.code(), Some(1), "{}", stderr_of(&out));
-    assert!(
-        stderr_of(&out).contains("another update holds"),
-        "{}",
-        stderr_of(&out)
-    );
-    assert_eq!(fs::read(&case.checkpoint).unwrap(), before);
-    drop(held);
-    fs::remove_dir_all(&case.dir).unwrap();
 }
 
 #[test]
@@ -612,27 +521,5 @@ fn a_streamed_reset_of_a_payload_over_the_buffered_limit_succeeds_where_the_buff
     let out = case.reset_with(TARGET_ID, &["--stream", "--max-buffered-payload", "1024"]);
     assert!(out.status.success(), "{}", stderr_of(&out));
     assert!(!case.checkpoint.exists());
-    fs::remove_dir_all(&case.dir).unwrap();
-}
-
-#[test]
-fn a_streamed_reset_with_no_checkpoint_confirms_the_absence_and_changes_nothing() {
-    let case = Case::new(
-        "streamed-none",
-        &full_image(0),
-        &vec![0x5au8; new_image().len()],
-    );
-    let out = case.reset_streamed(TARGET_ID);
-    assert!(out.status.success(), "{}", stderr_of(&out));
-    assert!(
-        stderr_of(&out).contains("no checkpoint to reset"),
-        "{}",
-        stderr_of(&out)
-    );
-    assert!(!case.checkpoint.exists());
-    assert_eq!(
-        fs::read(&case.device).unwrap(),
-        vec![0x5au8; new_image().len()]
-    );
     fs::remove_dir_all(&case.dir).unwrap();
 }

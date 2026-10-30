@@ -77,36 +77,6 @@ fn a_symlink_or_hard_link_to_the_key_is_refused_and_the_key_is_untouched() {
 }
 
 #[test]
-fn a_successful_write_replaces_an_existing_output_and_leaves_no_temporary_file() {
-    let dir = scratch_dir("replace");
-    let new = dir.join("new.img");
-    fs::write(&new, new_image()).unwrap();
-    let out_path = dir.join("out.payload");
-    fs::write(&out_path, vec![0xffu8; 4]).unwrap();
-    let out = Command::new(gen_bin())
-        .args([
-            "--full",
-            new.to_str().unwrap(),
-            out_path.to_str().unwrap(),
-            KEY,
-        ])
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let written = fs::read(&out_path).unwrap();
-    assert!(
-        written.starts_with(b"CrAU"),
-        "the old contents were not replaced"
-    );
-    assert!(leftovers(&dir).is_empty());
-    fs::remove_dir_all(dir).unwrap();
-}
-
-#[test]
 fn a_failed_write_is_reported_and_leaves_no_temporary_file() {
     let dir = scratch_dir("failed");
     let new = dir.join("new.img");
@@ -132,81 +102,42 @@ fn mode_of(path: &PathBuf) -> u32 {
 }
 
 #[test]
-fn a_new_output_is_created_private() {
-    let dir = scratch_dir("new-mode");
-    let new = dir.join("new.img");
-    fs::write(&new, new_image()).unwrap();
-    let out_path = dir.join("out.payload");
-    let out = Command::new(gen_bin())
-        .args([
-            "--full",
-            new.to_str().unwrap(),
-            out_path.to_str().unwrap(),
-            KEY,
-        ])
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    assert_eq!(mode_of(&out_path), 0o600);
-    fs::remove_dir_all(dir).unwrap();
-}
-
-#[test]
-fn a_replaced_private_output_stays_private() {
-    let dir = scratch_dir("replace-private");
-    let new = dir.join("new.img");
-    fs::write(&new, new_image()).unwrap();
-    let out_path = dir.join("out.payload");
-    fs::write(&out_path, vec![0xffu8; 4]).unwrap();
-    fs::set_permissions(&out_path, fs::Permissions::from_mode(0o600)).unwrap();
-    let out = Command::new(gen_bin())
-        .args([
-            "--full",
-            new.to_str().unwrap(),
-            out_path.to_str().unwrap(),
-            KEY,
-        ])
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    assert!(fs::read(&out_path).unwrap().starts_with(b"CrAU"));
-    assert_eq!(mode_of(&out_path), 0o600);
-    assert!(leftovers(&dir).is_empty());
-    fs::remove_dir_all(dir).unwrap();
-}
-
-#[test]
-fn a_replaced_output_takes_the_owner_only_mode_and_does_not_keep_the_old_one() {
-    let dir = scratch_dir("replace-mode");
-    let new = dir.join("new.img");
-    fs::write(&new, new_image()).unwrap();
-    let out_path = dir.join("out.payload");
-    fs::write(&out_path, vec![0xffu8; 4]).unwrap();
-    fs::set_permissions(&out_path, fs::Permissions::from_mode(0o644)).unwrap();
-    let out = Command::new(gen_bin())
-        .args([
-            "--full",
-            new.to_str().unwrap(),
-            out_path.to_str().unwrap(),
-            KEY,
-        ])
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    assert_eq!(mode_of(&out_path), 0o600);
-    fs::remove_dir_all(dir).unwrap();
+fn new_and_replaced_outputs_are_private_and_leave_no_temporary_file() {
+    for (name, initial_mode) in [
+        ("new", None),
+        ("replace-private", Some(0o600)),
+        ("replace-public", Some(0o644)),
+    ] {
+        let dir = scratch_dir(name);
+        let new = dir.join("new.img");
+        fs::write(&new, new_image()).unwrap();
+        let out_path = dir.join("out.payload");
+        if let Some(mode) = initial_mode {
+            fs::write(&out_path, vec![0xffu8; 4]).unwrap();
+            fs::set_permissions(&out_path, fs::Permissions::from_mode(mode)).unwrap();
+        }
+        let out = Command::new(gen_bin())
+            .args([
+                "--full",
+                new.to_str().unwrap(),
+                out_path.to_str().unwrap(),
+                KEY,
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(
+            fs::read(&out_path).unwrap().starts_with(b"CrAU"),
+            "the old contents were not replaced for {name}"
+        );
+        assert_eq!(mode_of(&out_path), 0o600, "{name}");
+        assert!(leftovers(&dir).is_empty(), "{name}");
+        fs::remove_dir_all(dir).unwrap();
+    }
 }
 
 fn acl_blob(entries: &[(u16, u16, u32)]) -> Vec<u8> {

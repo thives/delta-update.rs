@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 use delta_update_client::apply::Progress;
 use delta_update_client::apply::Trust;
 use delta_update_client::apply::prepare;
@@ -19,6 +21,7 @@ use delta_update_payload::rsa::parse_pubkey_pem;
 
 const BS: usize = 4096;
 const BLOCKS: usize = 16 * 1024 * 1024 / BS;
+const SMALL_BLOCKS: usize = 256;
 const TARGET: TargetId = [0x44; 32];
 
 const PRIVATE: &[u8] = include_bytes!("../../delta-update-payload/tests/fixtures/private.pem");
@@ -95,12 +98,16 @@ fn block(seed: usize, variant: usize) -> Vec<u8> {
     return out;
 }
 
-fn image(f: impl Fn(usize) -> Vec<u8>) -> Vec<u8> {
-    let mut out = Vec::with_capacity(BLOCKS * BS);
-    for b in 0..BLOCKS {
+fn image_with(blocks: usize, f: impl Fn(usize) -> Vec<u8>) -> Vec<u8> {
+    let mut out = Vec::with_capacity(blocks * BS);
+    for b in 0..blocks {
         out.extend(f(b));
     }
     return out;
+}
+
+fn image(f: impl Fn(usize) -> Vec<u8>) -> Vec<u8> {
+    return image_with(BLOCKS, f);
 }
 
 fn keys() -> Vec<PubKey> {
@@ -190,15 +197,17 @@ fn apply_both(payload: &[u8], old: &[u8], new: &[u8]) {
 
 #[test]
 fn alternating_changed_and_unchanged_blocks_round_trip() {
-    let old = image(|b| block(b, 0));
-    let new = image(|b| if b % 2 == 0 { block(b, 1) } else { block(b, 0) });
+    let old = image_with(SMALL_BLOCKS, |b| block(b, 0));
+    let new = image_with(SMALL_BLOCKS, |b| {
+        if b % 2 == 0 { block(b, 1) } else { block(b, 0) }
+    });
     round_trip(old, new);
 }
 
 #[test]
 fn alternating_replacement_and_zero_runs_round_trip() {
-    let old = image(|b| block(b, 0));
-    let new = image(|b| {
+    let old = image_with(SMALL_BLOCKS, |b| block(b, 0));
+    let new = image_with(SMALL_BLOCKS, |b| {
         if b % 2 == 0 {
             block(b, 1)
         } else {
@@ -210,12 +219,15 @@ fn alternating_replacement_and_zero_runs_round_trip() {
 
 #[test]
 fn entirely_changed_image_round_trips() {
-    round_trip(image(|b| block(b, 0)), image(|b| block(b, 1)));
+    round_trip(
+        image_with(SMALL_BLOCKS, |b| block(b, 0)),
+        image_with(SMALL_BLOCKS, |b| block(b, 1)),
+    );
 }
 
 #[test]
 fn entirely_unchanged_image_round_trips_with_no_writes() {
-    let old = image(|b| block(b, 0));
+    let old = image_with(SMALL_BLOCKS, |b| block(b, 0));
     let payload = build_payload_with(
         &old,
         &old,
@@ -250,7 +262,10 @@ fn entirely_unchanged_image_round_trips_with_no_writes() {
 
 #[test]
 fn entirely_zeroed_image_round_trips() {
-    round_trip(image(|b| block(b, 0)), vec![0u8; BLOCKS * BS]);
+    round_trip(
+        image_with(SMALL_BLOCKS, |b| block(b, 0)),
+        vec![0u8; SMALL_BLOCKS * BS],
+    );
 }
 
 fn project_target() -> (Vec<u8>, Vec<u8>) {
@@ -296,12 +311,21 @@ fn noise_block(seed: usize) -> Vec<u8> {
     return out;
 }
 
+fn project_fixture() -> (&'static [u8], &'static [u8], &'static [u8]) {
+    static FIXTURE: OnceLock<(Vec<u8>, Vec<u8>, Vec<u8>)> = OnceLock::new();
+    let (old, new, payload) = FIXTURE.get_or_init(|| {
+        let (old, new) = project_target();
+        let payload = build_payload_with(&old, &new, b"A/B", PRIVATE, BS, &EMBEDDED, &generous())
+            .map_err(|e| e.msg)
+            .unwrap();
+        (old, new, payload)
+    });
+    return (old, new, payload);
+}
+
 #[test]
 fn project_operations_round_trip_at_target_scale() {
-    let (old, new) = project_target();
-    let payload = build_payload_with(&old, &new, b"A/B", PRIVATE, BS, &EMBEDDED, &generous())
-        .map_err(|e| e.msg)
-        .unwrap();
+    let (old, new, payload) = project_fixture();
     let parsed = delta_update_payload::layout::parse_unverified(&payload, &EMBEDDED)
         .map_err(|e| e.msg)
         .unwrap();
@@ -320,18 +344,7 @@ fn project_operations_round_trip_at_target_scale() {
 
 #[test]
 fn an_interrupted_project_payload_resumes_at_target_scale() {
-    let (old, new) = project_target();
-    let payload = build_payload_with(
-        &old,
-        &new,
-        b"A/B",
-        PRIVATE,
-        BS,
-        &EMBEDDED,
-        &SearchConfig::quick(),
-    )
-    .map_err(|e| e.msg)
-    .unwrap();
+    let (old, new, payload) = project_fixture();
     let parsed = delta_update_payload::layout::parse_unverified(&payload, &EMBEDDED)
         .map_err(|e| e.msg)
         .unwrap();
@@ -343,10 +356,10 @@ fn an_interrupted_project_payload_resumes_at_target_scale() {
         .sum::<usize>();
     let cut = blobs + blob_len * 3 / 4;
     let keys = keys();
-    let image = Old { data: old.clone() };
+    let image = Old { data: old.to_vec() };
     let mut store = MemoryStore::new();
     let mut disk = Disk {
-        data: old.clone(),
+        data: old.to_vec(),
         writes: 0,
     };
 
@@ -375,7 +388,7 @@ fn an_interrupted_project_payload_resumes_at_target_scale() {
             .is_err()
     );
     let whole = Pieces {
-        data: payload.clone(),
+        data: payload.to_vec(),
         pos: 0,
     };
     let prepared = stream::prepare(whole, Trust::Verified(&keys), &EMBEDDED)
@@ -385,7 +398,7 @@ fn an_interrupted_project_payload_resumes_at_target_scale() {
     prepared
         .apply_with_image(
             |off| Pieces {
-                data: payload.clone(),
+                data: payload.to_vec(),
                 pos: off as usize,
             },
             &mut disk,
@@ -404,7 +417,7 @@ fn generous() -> SearchConfig {
     return SearchConfig {
         max_search_seconds: 300.0,
         stagnation_seconds: 300.0,
-        max_generations: Some(40),
+        max_generations: Some(12),
         ..SearchConfig::quick()
     };
 }

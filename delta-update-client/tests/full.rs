@@ -76,39 +76,21 @@ fn starting(len: usize) -> Vec<Vec<u8>> {
 }
 
 #[test]
-fn a_full_payload_updates_any_starting_contents_through_the_buffered_pipeline() {
+fn a_full_payload_updates_any_starting_contents_through_both_pipelines() {
     for new in shapes() {
         let payload = full(&new);
-        for start in starting(new.len()) {
-            let mut dev = Disk::new(start);
-            Session::new()
-                .buffered(&payload, &mut dev)
-                .map_err(|e| e.msg)
-                .unwrap();
-            assert!(
-                dev.data == new,
-                "buffered: the image of {} bytes did not apply",
-                new.len()
-            );
-        }
-    }
-}
-
-#[test]
-fn a_full_payload_updates_any_starting_contents_through_the_streamed_pipeline() {
-    for new in shapes() {
-        let payload = full(&new);
-        for chunk in [97usize, BS] {
+        for chunk in [None, Some(97usize), Some(BS)] {
             for start in starting(new.len()) {
                 let mut dev = Disk::new(start);
-                Session::new()
-                    .streamed(&payload, chunk, &mut dev)
-                    .map_err(|e| e.msg)
-                    .unwrap();
+                let result = match chunk {
+                    Some(chunk) => Session::new().streamed(&payload, chunk, &mut dev),
+                    None => Session::new().buffered(&payload, &mut dev),
+                };
+                result.map_err(|e| e.msg).unwrap();
                 assert!(
                     dev.data == new,
-                    "streamed {}: the image of {} bytes did not apply",
-                    chunk,
+                    "{}: the image of {} bytes did not apply",
+                    chunk.map_or_else(|| "buffered".to_string(), |size| format!("streamed {size}")),
                     new.len()
                 );
             }

@@ -11,9 +11,9 @@
 
 use alloc::vec::Vec;
 
-use crate::error::{err, Code, PayloadError};
-use crate::schema::signatures::Signature;
+use crate::error::{Code, PayloadError, err};
 use crate::schema::Signatures;
+use crate::schema::signatures::Signature;
 use prost::Message;
 
 fn varint_size(v: usize) -> usize {
@@ -75,9 +75,12 @@ pub fn build_signature_message(key_size: usize, sig_data: &[u8]) -> Result<Vec<u
     checked_message_size(key_size)?;
 
     let mut padded = Vec::new();
-    padded
-        .try_reserve_exact(key_size)
-        .map_err(|_| err(Code::resource_limit, "signature reservation cannot be allocated"))?;
+    padded.try_reserve_exact(key_size).map_err(|_| {
+        err(
+            Code::resource_limit,
+            "signature reservation cannot be allocated",
+        )
+    })?;
     padded.resize(key_size, 0);
     let mut i = 0;
     while i < sig_data.len() {
@@ -117,7 +120,9 @@ mod tests {
         let encoded = success(build_signature_message(3, &[0xaa, 0xbb]));
         assert_eq!(
             encoded,
-            [0x0a, 0x0a, 0x12, 0x03, 0xaa, 0xbb, 0x00, 0x1d, 0x02, 0x00, 0x00, 0x00,]
+            [
+                0x0a, 0x0a, 0x12, 0x03, 0xaa, 0xbb, 0x00, 0x1d, 0x02, 0x00, 0x00, 0x00,
+            ]
         );
         let empty = success(build_signature_message(0, &[]));
         assert_eq!(
@@ -127,25 +132,27 @@ mod tests {
     }
 
     #[test]
-    fn sizes_match_known_rsa_reservations() {
+    fn size_helpers_match_known_wire_sizes_and_generated_encodings() {
         for (key_size, entry_size, message_size) in [(256, 264, 267), (512, 520, 523)] {
             assert_eq!(sig_entry_size(key_size), entry_size);
             assert_eq!(signature_message_size(key_size), message_size);
         }
-    }
 
-    #[test]
-    fn checked_sizes_agree_with_the_wire_sizes_and_refuse_wrapping_ones() {
         for key_size in [0, 1, 127, 128, 16383, 16384, 1 << 20] {
-            assert_eq!(checked_message_size(key_size).ok(), Some(signature_message_size(key_size)));
+            assert_eq!(
+                checked_message_size(key_size).ok(),
+                Some(signature_message_size(key_size))
+            );
         }
         for key_size in [usize::MAX, usize::MAX - 1, usize::MAX - 16] {
-            assert_eq!(checked_message_size(key_size).err().map(|e| e.code), Some(Code::overflow), "key {}", key_size);
+            assert_eq!(
+                checked_message_size(key_size).err().map(|e| e.code),
+                Some(Code::overflow),
+                "key {}",
+                key_size
+            );
         }
-    }
 
-    #[test]
-    fn size_helpers_agree_with_generated_encoder() {
         for key_size in [
             0, 1, 3, 120, 121, 127, 128, 255, 256, 512, 16375, 16376, 16383, 16384,
         ] {

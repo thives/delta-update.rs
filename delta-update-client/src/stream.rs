@@ -227,21 +227,45 @@ mod tests {
         let keys = keys();
         let mut streamed = Dev::new(old_image());
 
+        let mut streamed_store = MemoryStore::new();
         run(
             &payload,
             Trust::Verified(&keys),
             7,
             &mut streamed,
-            &mut MemoryStore::new(),
+            &mut streamed_store,
         )
         .unwrap();
+        let streamed_writes = streamed.writes;
+        run(
+            &payload,
+            Trust::Verified(&keys),
+            7,
+            &mut streamed,
+            &mut streamed_store,
+        )
+        .unwrap();
+
         let mut buffered = Dev::new(old_image());
+        let mut buffered_store = MemoryStore::new();
         let prepared = prepare_buffered(&payload, Trust::Verified(&keys), &EMBEDDED).unwrap();
         prepared
             .apply_to_device_with_image(
                 &mut buffered,
                 &SliceImage { data: &old_image() },
-                &mut MemoryStore::new(),
+                &mut buffered_store,
+                &TARGET,
+                Policy::Development,
+                &NoProgress {},
+            )
+            .unwrap();
+        let buffered_writes = buffered.writes;
+        let prepared = prepare_buffered(&payload, Trust::Verified(&keys), &EMBEDDED).unwrap();
+        prepared
+            .apply_to_device_with_image(
+                &mut buffered,
+                &SliceImage { data: &old_image() },
+                &mut buffered_store,
                 &TARGET,
                 Policy::Development,
                 &NoProgress {},
@@ -249,6 +273,8 @@ mod tests {
             .unwrap();
         assert_eq!(streamed.data, new_image());
         assert_eq!(streamed.data, buffered.data);
+        assert_eq!(streamed.writes, streamed_writes);
+        assert_eq!(buffered.writes, buffered_writes);
     }
 
     #[test]
@@ -275,19 +301,6 @@ mod tests {
         .unwrap();
         assert!(dev.writes - before < fresh.writes);
         assert!(fresh.writes <= BLOCKS * 2);
-    }
-
-    #[test]
-    fn reapplying_a_completed_update_writes_nothing() {
-        let payload = signed_payload();
-        let keys = keys();
-        let mut store = MemoryStore::new();
-        let mut dev = Dev::new(old_image());
-        run(&payload, Trust::Verified(&keys), 64, &mut dev, &mut store).unwrap();
-        let writes = dev.writes;
-        run(&payload, Trust::Verified(&keys), 64, &mut dev, &mut store).unwrap();
-        assert_eq!(dev.writes, writes);
-        assert_eq!(dev.data, new_image());
     }
 
     #[test]

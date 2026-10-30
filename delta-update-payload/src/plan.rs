@@ -177,7 +177,10 @@ fn derive_contract(m: &Manifest, g: &Geometry) -> Result<Contract, PayloadError>
 }
 
 fn sparse_keeps_no_chunk(op: &Operation, chunk: u64) -> bool {
-    let total = op.dst_extents.iter().fold(0u64, |a, e| a.saturating_add(extent_of(e).1));
+    let total = op
+        .dst_extents
+        .iter()
+        .fold(0u64, |a, e| a.saturating_add(extent_of(e).1));
     let count = match chunk_count(total, chunk) {
         None => return false,
         Some(n) => n,
@@ -492,17 +495,11 @@ fn check_copy(
         Ok(v) => v,
     };
     if op_len != 0 {
-        return Err(err(
-            Code::blob_mismatch,
-            "a copy carries no blob",
-        ));
+        return Err(err(Code::blob_mismatch, "a copy carries no blob"));
     }
     if let Some(h) = &op.data_sha256_hash {
         if !h.is_empty() {
-            return Err(err(
-                Code::unsupported_field,
-                "a copy carries no data hash",
-            ));
+            return Err(err(Code::unsupported_field, "a copy carries no data hash"));
         }
     }
     if src_total != total {
@@ -704,9 +701,9 @@ fn require_data_hash(op: &Operation) -> Result<(), PayloadError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::encoding::push_varint;
     use crate::manifest::PartitionUpdate;
     use crate::profile::EMBEDDED;
-    use crate::encoding::push_varint;
     use alloc::string::ToString;
     use alloc::vec;
     use alloc::vec::Vec;
@@ -850,10 +847,7 @@ mod tests {
         assert_eq!(code_of(manifest(vec![short])), Code::blob_mismatch);
         let mut bare = replace(0, BS, vec![ext(0, BS)]);
         bare.data_sha256_hash = None;
-        assert_eq!(
-            code_of(manifest(vec![bare])),
-            Code::required_field_missing
-        );
+        assert_eq!(code_of(manifest(vec![bare])), Code::required_field_missing);
     }
 
     #[test]
@@ -1141,7 +1135,11 @@ mod tests {
 
     #[test]
     fn copy_source_must_lie_inside_the_recorded_partition() {
-        let mut m = manifest(vec![copy_op(TYPE_SOURCECOPY, vec![ext(3 * BS, BS)], vec![ext(0, BS)])]);
+        let mut m = manifest(vec![copy_op(
+            TYPE_SOURCECOPY,
+            vec![ext(3 * BS, BS)],
+            vec![ext(0, BS)],
+        )]);
         m.partitions[0].old_partition_info = Some(PartInfo {
             size: Some(4 * BS),
             hash: None,
@@ -1208,38 +1206,63 @@ mod tests {
     }
 
     #[test]
-    fn disjoint_and_adjacent_ranges_do_not_meet() {
-        assert!(!meets(&[ext(0, BS)], &[ext(2 * BS, BS)]));
-        assert!(!meets(&[ext(0, BS)], &[ext(BS, BS)]));
-        assert!(!meets(&[ext(BS, BS)], &[ext(0, BS)]));
-    }
-
-    #[test]
-    fn one_shared_byte_meets() {
-        assert!(meets(&[ext(0, BS + 1)], &[ext(BS, BS)]));
-        assert!(meets(&[ext(BS, BS)], &[ext(0, BS + 1)]));
-    }
-
-    #[test]
-    fn a_range_that_contains_another_meets_it() {
-        assert!(meets(&[ext(0, 4 * BS)], &[ext(2 * BS, BS)]));
-    }
-
-    #[test]
-    fn unordered_ranges_are_sorted_before_they_are_compared() {
-        let a = [ext(5 * BS, BS), ext(0, BS)];
-        let b = [ext(3 * BS, BS), ext(BS, BS)];
-        assert!(!meets(&a, &b));
-        let b_hit = [ext(3 * BS, BS), ext(BS, BS), ext(6 * BS - 1, 1)];
-        assert!(meets(&a, &b_hit));
-    }
-
-    #[test]
-    fn overlap_within_one_list_is_allowed_and_does_not_hide_a_meeting() {
-        let a = [ext(0, 2 * BS), ext(BS, 2 * BS)];
-        let b = [ext(3 * BS, BS), ext(3 * BS + BS / 2, BS)];
-        assert!(!meets(&a, &b));
-        assert!(meets(&a, &[ext(3 * BS, BS), ext(2 * BS + 1, 1)]));
+    fn range_intersection_handles_boundaries_ordering_and_overlapping_lists() {
+        let cases = [
+            ("separated", vec![ext(0, BS)], vec![ext(2 * BS, BS)], false),
+            ("adjacent", vec![ext(0, BS)], vec![ext(BS, BS)], false),
+            (
+                "adjacent in reverse",
+                vec![ext(BS, BS)],
+                vec![ext(0, BS)],
+                false,
+            ),
+            (
+                "one shared byte",
+                vec![ext(0, BS + 1)],
+                vec![ext(BS, BS)],
+                true,
+            ),
+            (
+                "one shared byte in reverse",
+                vec![ext(BS, BS)],
+                vec![ext(0, BS + 1)],
+                true,
+            ),
+            (
+                "containment",
+                vec![ext(0, 4 * BS)],
+                vec![ext(2 * BS, BS)],
+                true,
+            ),
+            (
+                "unordered non-meeting lists",
+                vec![ext(5 * BS, BS), ext(0, BS)],
+                vec![ext(3 * BS, BS), ext(BS, BS)],
+                false,
+            ),
+            (
+                "unordered lists with a shared byte",
+                vec![ext(5 * BS, BS), ext(0, BS)],
+                vec![ext(3 * BS, BS), ext(BS, BS), ext(6 * BS - 1, 1)],
+                true,
+            ),
+            (
+                "overlap within each list does not hide separation",
+                vec![ext(0, 2 * BS), ext(BS, 2 * BS)],
+                vec![ext(3 * BS, BS), ext(3 * BS + BS / 2, BS)],
+                false,
+            ),
+            (
+                "overlap within each list still finds a meeting",
+                vec![ext(0, 2 * BS), ext(BS, 2 * BS)],
+                vec![ext(3 * BS, BS), ext(2 * BS + 1, 1)],
+                true,
+            ),
+        ];
+        for (name, a, b, expected) in cases {
+            assert_eq!(meets(&a, &b), expected, "{name}");
+            assert_eq!(meets(&b, &a), expected, "{name} (reversed)");
+        }
     }
 
     #[test]
@@ -1292,13 +1315,25 @@ mod tests {
             num_bytes: None,
         };
         let dst_no_start = replace(0, BS, vec![no_start.clone()]);
-        assert_eq!(code_of(manifest(vec![dst_no_start])), Code::required_field_missing);
+        assert_eq!(
+            code_of(manifest(vec![dst_no_start])),
+            Code::required_field_missing
+        );
         let dst_no_length = replace(0, BS, vec![no_length.clone()]);
-        assert_eq!(code_of(manifest(vec![dst_no_length])), Code::required_field_missing);
+        assert_eq!(
+            code_of(manifest(vec![dst_no_length])),
+            Code::required_field_missing
+        );
         let src_no_start = copy_op(TYPE_TARGET_COPY, vec![no_start], vec![ext(2 * BS, BS)]);
-        assert_eq!(code_of(manifest(vec![src_no_start])), Code::required_field_missing);
+        assert_eq!(
+            code_of(manifest(vec![src_no_start])),
+            Code::required_field_missing
+        );
         let dst_no_len = copy_op(TYPE_TARGET_COPY, vec![ext(0, BS)], vec![no_length]);
-        assert_eq!(code_of(manifest(vec![dst_no_len])), Code::required_field_missing);
+        assert_eq!(
+            code_of(manifest(vec![dst_no_len])),
+            Code::required_field_missing
+        );
     }
 
     #[test]
@@ -1369,7 +1404,10 @@ mod tests {
             replace(0, BS, vec![ext(0, BS)]),
             zero(BS, vec![ext(BS, BS)]),
         ];
-        assert_eq!(contract_of(sized(ops, 2 * BS)), Contract::DestinationIndependent);
+        assert_eq!(
+            contract_of(sized(ops, 2 * BS)),
+            Contract::DestinationIndependent
+        );
     }
 
     #[test]
@@ -1384,7 +1422,10 @@ mod tests {
             replace(0, BS, vec![ext(BS, BS)]),
             replace(BS, 2 * BS, vec![ext(0, BS), ext(2 * BS, BS)]),
         ];
-        assert_eq!(contract_of(sized(ops, 3 * BS)), Contract::DestinationIndependent);
+        assert_eq!(
+            contract_of(sized(ops, 3 * BS)),
+            Contract::DestinationIndependent
+        );
     }
 
     #[test]
@@ -1404,8 +1445,15 @@ mod tests {
 
     #[test]
     fn a_source_copy_covering_the_prefix_is_destination_independent() {
-        let ops = vec![copy_op(TYPE_SOURCECOPY, vec![ext(0, 2 * BS)], vec![ext(0, 2 * BS)])];
-        assert_eq!(contract_of(sized(ops, 2 * BS)), Contract::DestinationIndependent);
+        let ops = vec![copy_op(
+            TYPE_SOURCECOPY,
+            vec![ext(0, 2 * BS)],
+            vec![ext(0, 2 * BS)],
+        )];
+        assert_eq!(
+            contract_of(sized(ops, 2 * BS)),
+            Contract::DestinationIndependent
+        );
     }
 
     #[test]
@@ -1421,7 +1469,10 @@ mod tests {
         let mut op = sparse_op(map_of(&[1, 1]), 0, vec![ext(0, 2 * BS)]);
         op.data_sha256_hash = Some(hash_of(&[]));
         let ops = vec![op];
-        assert_eq!(contract_of(sized(ops, 2 * BS)), Contract::DestinationIndependent);
+        assert_eq!(
+            contract_of(sized(ops, 2 * BS)),
+            Contract::DestinationIndependent
+        );
     }
 
     #[test]
@@ -1433,7 +1484,10 @@ mod tests {
     #[test]
     fn an_empty_program_covers_only_an_empty_image() {
         assert_eq!(contract_of(sized(vec![], 2 * BS)), Contract::BaseDependent);
-        assert_eq!(contract_of(sized(vec![], 0)), Contract::DestinationIndependent);
+        assert_eq!(
+            contract_of(sized(vec![], 0)),
+            Contract::DestinationIndependent
+        );
     }
 
     #[test]
@@ -1443,19 +1497,29 @@ mod tests {
             replace(BS, BS, vec![ext(BS, BS)]),
             replace(2 * BS, 2 * BS, vec![ext(2 * BS, BS), ext(3 * BS, BS)]),
         ];
-        assert_eq!(contract_of(sized(ops, 4 * BS)), Contract::DestinationIndependent);
+        assert_eq!(
+            contract_of(sized(ops, 4 * BS)),
+            Contract::DestinationIndependent
+        );
     }
 
     #[test]
     fn a_one_byte_gap_between_extents_is_base_dependent() {
-        let ops = vec![replace(0, 2 * BS - 1, vec![ext(0, BS), ext(BS + 1, BS - 1)])];
+        let ops = vec![replace(
+            0,
+            2 * BS - 1,
+            vec![ext(0, BS), ext(BS + 1, BS - 1)],
+        )];
         assert_eq!(contract_of(sized(ops, 2 * BS)), Contract::BaseDependent);
     }
 
     #[test]
     fn overlapping_extents_within_one_operation_cover_their_union() {
         let ops = vec![replace(0, 3 * BS, vec![ext(0, 2 * BS), ext(BS, BS)])];
-        assert_eq!(contract_of(sized(ops, 2 * BS)), Contract::DestinationIndependent);
+        assert_eq!(
+            contract_of(sized(ops, 2 * BS)),
+            Contract::DestinationIndependent
+        );
     }
 
     #[test]
@@ -1467,9 +1531,15 @@ mod tests {
             contract_of(sized(vec![op], blocks * BS)),
             Contract::DestinationIndependent
         );
-        let holed: Vec<Extent> = full.into_iter().filter(|e| e.start_byte != Some(77 * BS)).collect();
+        let holed: Vec<Extent> = full
+            .into_iter()
+            .filter(|e| e.start_byte != Some(77 * BS))
+            .collect();
         let n = holed.len() as u64;
         let op = replace(0, n * BS, holed);
-        assert_eq!(contract_of(sized(vec![op], blocks * BS)), Contract::BaseDependent);
+        assert_eq!(
+            contract_of(sized(vec![op], blocks * BS)),
+            Contract::BaseDependent
+        );
     }
 }

@@ -343,15 +343,11 @@ fn assert_four_blocks_framed_and_five_raw(profile: &ResourceProfile) {
 }
 
 #[test]
-fn the_operation_limit_alone_decides_between_the_framed_and_raw_forms() {
+fn operation_and_extent_limits_alone_decide_between_the_framed_and_raw_forms() {
     assert_four_blocks_framed_and_five_raw(&ResourceProfile {
         max_operations: 4,
         ..EMBEDDED
     });
-}
-
-#[test]
-fn the_extent_limit_alone_decides_between_the_framed_and_raw_forms() {
     assert_four_blocks_framed_and_five_raw(&ResourceProfile {
         max_total_extents: 4,
         ..EMBEDDED
