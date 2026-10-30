@@ -5,6 +5,12 @@ between two partition images, then verify and apply it to byte-addressed storage
 resumably, one operation at a time. The protobuf schema is vendored into
 `delta-update-payload/schema/`; the project does not require an `update_engine/` source tree.
 
+> [!WARNING]
+> This crate is in early development. The API is not yet stable and may change.
+
+> [!CAUTION]
+> This crate is not yet production-ready. It has not been widely tested and may contain bugs.
+
 ## Scope
 
 | In scope | Out of scope |
