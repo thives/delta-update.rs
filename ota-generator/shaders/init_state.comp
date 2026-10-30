@@ -1,0 +1,30 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+// Reset the search: no control counts, an empty population, an empty archive, every pool slot free,
+// and the first generation's candidates in the first pool slots. One thread.
+#include "layout.glsl"
+#define LOCAL_SIZE 1
+#include "common.glsl"
+#include "program.glsl"
+
+void main() {
+    if (gl_GlobalInvocationID.x != 0u) {
+        return;
+    }
+    for (uint w = 0u; w < uint(CTL_WORDS); w++) {
+        st[ST_CTL + w] = 0u;
+    }
+    st[ST_CTL + C_BEST] = FIT_INVALID;
+    for (uint s = 0u; s < uint(SLOTS); s++) {
+        p_clear(slot_base(s));
+    }
+    for (uint k = 0u; k < uint(POP); k++) {
+        st[ST_POP + k] = 0u;
+    }
+    for (uint k = 0u; k < uint(POOL); k++) {
+        st[ST_FREE + k] = k;
+    }
+    for (uint k = 0u; k < uint(NCAND); k++) {
+        st[ST_CAND + k] = k;
+    }
+}

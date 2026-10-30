@@ -1,0 +1,63 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+
+// Breed one generation: each non-elite child is an immigrant, a crossover of two tournament
+// winners, or a mutation of one. The children go to the free pool slots. Elites stay where they
+// are, so only children are written. One thread per child.
+#include "layout.glsl"
+#define LOCAL_SIZE 1
+#include "common.glsl"
+#include "program.glsl"
+#include "moves.glsl"
+
+uint members;
+
+// The best of TOURNAMENT random members, by raw size. Members are sorted, best first.
+uint tournament() {
+    uint best = below(members);
+    uint best_fit = st[slot_base(st[ST_POP + best]) + H_FIT];
+    for (uint k = 1u; k < uint(TOURNAMENT); k++) {
+        uint other = below(members);
+        uint fit = st[slot_base(st[ST_POP + other]) + H_FIT];
+        if (fit < best_fit) {
+            best = other;
+            best_fit = fit;
+        }
+    }
+    return slot_base(st[ST_POP + best]);
+}
+
+void main() {
+    images_init();
+    uint j = gl_GlobalInvocationID.x;
+    if (j >= uint(CHILDREN)) {
+        return;
+    }
+    uint id = st[ST_FREE + j];
+    st[ST_CAND + j] = id;
+    uint chd = slot_base(id);
+    uint scr0 = slot_base(uint(SLOT_SCR) + 2u * j);
+    uint scr1 = slot_base(uint(SLOT_SCR) + 2u * j + 1u);
+    R = rng_seed(P(P_SEED0), P(P_SEED1), pc.gen, j);
+    members = st[ST_CTL + C_NVALID];
+    // Push a1 forces how children are made, and a0 forces which move a mutation makes (plus one).
+    // The search leaves both zero, and the tests use them to reach one operator at a time.
+    uint how = pc.a1;
+    bool made;
+    if (members == 0u || how == 1u || (how == 0u && pct(IMMIGRANT_PERCENT))) {
+        make_immigrant(chd);
+        made = true;
+    } else if (members >= 2u && (how == 2u || (how == 0u && pct(CROSSOVER_PERCENT)))) {
+        uint a = tournament();
+        uint b = tournament();
+        made = mv_crossover(a, b, chd);
+    } else {
+        uint par = tournament();
+        uint mv = pc.a0 != 0u ? pc.a0 - 1u : pick_move();
+        made = apply_move(mv, par, chd, scr0, scr1);
+    }
+    if (!made) {
+        p_clear(chd);
+    }
+    ctl_add(C_BRED, 1u);
+}

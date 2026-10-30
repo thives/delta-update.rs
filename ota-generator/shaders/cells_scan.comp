@@ -1,0 +1,23 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+// The changed cells, step 2: the exclusive prefix of the block counts, and the total, which is the
+// number of changed cells. One thread.
+#include "layout.glsl"
+#define LOCAL_SIZE 1
+#include "common.glsl"
+
+void main() {
+    if (gl_GlobalInvocationID.x != 0u) {
+        return;
+    }
+    uint cells = P(P_NCELLS);
+    uint blocks = (cells + uint(BLOCK_CELLS) - 1u) / uint(BLOCK_CELLS);
+    uint counts = P(P_BLOCKS);
+    uint sum = 0u;
+    for (uint b = 0u; b < blocks; b++) {
+        uint n = ix[counts + b];
+        ix[counts + blocks + b] = sum;
+        sum += n;
+    }
+    st[ST_PARAMS + P_NCHANGED] = sum;
+}

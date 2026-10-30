@@ -1,0 +1,37 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+// Copy-source tables, step 2: one step of a bitonic sort of {hash, position} pairs. Push
+// constants: a0 selects the table (0 old, 1 new), a1 is the block size k, a2 the distance j.
+// Sorting by the pair makes the table, and so every lookup in it, independent of how the
+// threads were scheduled.
+#include "layout.glsl"
+#include "common.glsl"
+
+bool greater(uint ah, uint ap, uint bh, uint bp) {
+    return ah > bh || (ah == bh && ap > bp);
+}
+
+void main() {
+    bool tgt = pc.a0 != 0u;
+    uint cap = tgt ? P(P_NEW_CAP) : P(P_OLD_CAP);
+    uint base = tgt ? P(P_NEW_TABLE) : P(P_OLD_TABLE);
+    uint k = pc.a1;
+    uint j = pc.a2;
+    uint step = gl_NumWorkGroups.x * uint(WORKGROUP);
+    for (uint t = gl_GlobalInvocationID.x; t < cap / 2u; t += step) {
+        uint l = ((t & ~(j - 1u)) << 1u) | (t & (j - 1u));
+        uint r = l | j;
+        bool ascending = (l & k) == 0u;
+        uint ah = ix[base + 2u * l];
+        uint ap = ix[base + 2u * l + 1u];
+        uint bh = ix[base + 2u * r];
+        uint bp = ix[base + 2u * r + 1u];
+        bool swap = ascending ? greater(ah, ap, bh, bp) : greater(bh, bp, ah, ap);
+        if (swap) {
+            ix[base + 2u * l] = bh;
+            ix[base + 2u * l + 1u] = bp;
+            ix[base + 2u * r] = ah;
+            ix[base + 2u * r + 1u] = ap;
+        }
+    }
+}

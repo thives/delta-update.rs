@@ -1,0 +1,38 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+// Evaluation, step 4: write the repair's extents. Thread (k, j) writes the mismatch spans that
+// start in range k of candidate j, at the position the prefix gave it, in ascending order.
+#include "layout.glsl"
+#include "common.glsl"
+#include "program.glsl"
+#include "replay.glsl"
+#include "scan.glsl"
+
+void main() {
+    images_init();
+    uint k = gl_GlobalInvocationID.x;
+    uint j = gl_GlobalInvocationID.y;
+    if (j >= pc.a0 || k >= P(P_SCAN_RANGES)) {
+        return;
+    }
+    uint sb = slot_base(st[ST_CAND + j]);
+    if (st[sb + H_STATUS] != uint(S_OK) || st[sb + H_MISM] == 0u) {
+        return;
+    }
+    // A range that no span starts in writes nothing. A span that runs into it ends where the prefix
+    // says, in `sc_finish` of the range that holds its start, so the range can be skipped outright.
+    uint at = scan_base(j) + k * uint(SCANW);
+    if (st[at + SC_COUNT] == 0u) {
+        return;
+    }
+    r_attach(runs_base(j));
+    rn = st[sb + H_RUNS];
+    uint len = P(P_NEW_LEN);
+    uint width = P(P_SCAN_LEN);
+    uint a = min(k * width, len);
+    uint b = min(a + width, len);
+    uint repair = st[sb + H_RAWOPS];
+    uint first_out = o_dfirst(sb, repair) + st[at + SC_BASE];
+    sc_range(sb, a, b, true, first_out);
+    sc_finish(st[at + SC_NEXTOK]);
+}

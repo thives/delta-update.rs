@@ -1,0 +1,31 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+
+// The first generation: the raw replacement of the whole image, the compact program that writes
+// only what differs, the empty program (which the repair turns into exactly the changed bytes),
+// and random immigrants for the rest. One thread per candidate.
+#include "layout.glsl"
+#define LOCAL_SIZE 1
+#include "common.glsl"
+#include "program.glsl"
+#include "moves.glsl"
+
+void main() {
+    images_init();
+    uint j = gl_GlobalInvocationID.x;
+    if (j >= uint(NCAND)) {
+        return;
+    }
+    uint chd = slot_base(st[ST_CAND + j]);
+    R = rng_seed(P(P_SEED0), P(P_SEED1), 0u, j);
+    if (j == 0u) {
+        make_raw(chd);
+    } else if (j == 1u) {
+        make_compact(chd);
+    } else if (j == 2u) {
+        w_begin(chd);
+        w_end();
+    } else {
+        make_immigrant(chd);
+    }
+}

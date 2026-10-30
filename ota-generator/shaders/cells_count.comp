@@ -1,0 +1,23 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+// The changed cells, step 1: how many cells of each block of BLOCK_CELLS differ from the old image.
+#include "layout.glsl"
+#include "common.glsl"
+
+void main() {
+    uint cells = P(P_NCELLS);
+    uint blocks = (cells + uint(BLOCK_CELLS) - 1u) / uint(BLOCK_CELLS);
+    uint classes = P(P_CLASSES);
+    uint counts = P(P_BLOCKS);
+    uint step = gl_NumWorkGroups.x * uint(WORKGROUP);
+    for (uint b = gl_GlobalInvocationID.x; b < blocks; b += step) {
+        uint n = 0u;
+        uint end = min((b + 1u) * uint(BLOCK_CELLS), cells);
+        for (uint g = b * uint(BLOCK_CELLS); g < end; g++) {
+            if ((ix[classes + g] & uint(CELL_EQUAL)) == 0u) {
+                n++;
+            }
+        }
+        ix[counts + b] = n;
+    }
+}

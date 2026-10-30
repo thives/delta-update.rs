@@ -1,0 +1,66 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+// Evaluation, step 3: turn the per-range counts into output positions, and append the repair.
+// A program that leaves bytes wrong gets one raw replacement over exactly those bytes, as its last
+// operation, when the profile and the workspace have room for it. The repair is part of the
+// stored program, so the program and its size always describe the same payload.
+#include "layout.glsl"
+#define LOCAL_SIZE 1
+#include "common.glsl"
+#include "program.glsl"
+
+void main() {
+    uint j = gl_GlobalInvocationID.x;
+    if (j >= pc.a0) {
+        return;
+    }
+    uint sb = slot_base(st[ST_CAND + j]);
+    st[sb + H_MISM] = 0u;
+    st[sb + H_MISMBYTES] = 0u;
+    st[sb + H_RAWOPS] = p_nops(sb);
+    if (st[sb + H_STATUS] != uint(S_OK)) {
+        return;
+    }
+    uint ranges = P(P_SCAN_RANGES);
+    uint base = scan_base(j);
+    uint spans = 0u;
+    uint bytes = 0u;
+    for (uint k = 0u; k < ranges; k++) {
+        uint at = base + k * uint(SCANW);
+        st[at + SC_BASE] = spans;
+        spans += st[at + SC_COUNT];
+        bytes += st[at + SC_BYTES];
+    }
+    uint running = P(P_NEW_LEN);
+    for (uint k = ranges; k > 0u; k--) {
+        uint at = base + (k - 1u) * uint(SCANW);
+        st[at + SC_NEXTOK] = running;
+        uint ok = st[at + SC_FIRSTOK];
+        if (ok != NO_POS) {
+            running = ok;
+        }
+    }
+    st[sb + H_MISM] = spans;
+    st[sb + H_MISMBYTES] = bytes;
+    if (spans == 0u) {
+        return;
+    }
+    uint nops = p_nops(sb);
+    uint next = p_next(sb);
+    if (nops + 1u > uint(OP_CAP) || next + spans > uint(EXT_CAP)) {
+        st[sb + H_STATUS] = nops + 1u > uint(OP_CAP) ? uint(S_OPCAP) : uint(S_EXTCAP);
+        return;
+    }
+    if (nops + 1u > P(P_MAX_OPS) || next + spans > P(P_MAX_EXT_TOTAL) || spans > P(P_MAX_EXT_OP)) {
+        st[sb + H_STATUS] = uint(S_REPAIR);
+        return;
+    }
+    uint at = sb + uint(SLOT_OPS) + nops * uint(OPW);
+    st[at] = uint(K_REPLACE);
+    st[at + 1u] = next;
+    st[at + 2u] = spans;
+    st[at + 3u] = next + spans;
+    st[at + 4u] = 0u;
+    st[sb + H_NOPS] = nops + 1u;
+    st[sb + H_NEXT] = next + spans;
+}

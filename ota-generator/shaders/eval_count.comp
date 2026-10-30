@@ -1,0 +1,33 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+// Evaluation, step 2: count the mismatch spans of each byte range of each replayed target.
+// Thread (k, j) scans range k of candidate j.
+#include "layout.glsl"
+#include "common.glsl"
+#include "program.glsl"
+#include "replay.glsl"
+#include "scan.glsl"
+
+void main() {
+    images_init();
+    uint k = gl_GlobalInvocationID.x;
+    uint j = gl_GlobalInvocationID.y;
+    if (j >= pc.a0 || k >= P(P_SCAN_RANGES)) {
+        return;
+    }
+    uint sb = slot_base(st[ST_CAND + j]);
+    if (st[sb + H_STATUS] != uint(S_OK)) {
+        return;
+    }
+    r_attach(runs_base(j));
+    rn = st[sb + H_RUNS];
+    uint len = P(P_NEW_LEN);
+    uint width = P(P_SCAN_LEN);
+    uint a = min(k * width, len);
+    uint b = min(a + width, len);
+    sc_range(sb, a, b, false, 0u);
+    uint at = scan_base(j) + k * uint(SCANW);
+    st[at + SC_COUNT] = sc_n;
+    st[at + SC_BYTES] = sc_bytes;
+    st[at + SC_FIRSTOK] = sc_ok;
+}

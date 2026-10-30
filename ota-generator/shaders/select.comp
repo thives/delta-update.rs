@@ -1,0 +1,200 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+// Select the next population, and keep the finalists.
+//
+// The next population is the elites of this one plus every admitted child, without duplicates,
+// best first. Children that were not admitted are passed over. The pool slots that no member
+// holds become the free list the next generation breeds into.
+//
+// Separately, the archive keeps the best programs ever admitted, one per distinct set of raw-written
+// bytes, because two programs that write the same bytes raw compress alike. The archive is what the
+// host reads when the search ends. One work group: one thread decides, all of them copy.
+#include "layout.glsl"
+#include "common.glsl"
+#include "program.glsl"
+
+#define ENTRIES (POP + NCAND)
+
+shared uint sh_actions;
+shared uint sh_src[NCAND];
+shared uint sh_dst[NCAND];
+
+uint fit_of(uint id) {
+    return st[slot_base(id) + H_FIT];
+}
+
+void decide() {
+    uint ncand = pc.a0;
+    uint members = st[ST_CTL + C_NVALID];
+    uint keep = min(members, uint(ELITES));
+    uint e_id[ENTRIES];
+    uint e_fit[ENTRIES];
+    uint e_a[ENTRIES];
+    uint e_b[ENTRIES];
+    uint n = 0u;
+    for (uint i = 0u; i < keep; i++) {
+        uint id = st[ST_POP + i];
+        uint sb = slot_base(id);
+        e_id[n] = id;
+        e_fit[n] = st[sb + H_FIT];
+        e_a[n] = st[sb + H_FP0];
+        e_b[n] = st[sb + H_FP1];
+        n++;
+    }
+    for (uint j = 0u; j < ncand; j++) {
+        uint id = st[ST_CAND + j];
+        uint sb = slot_base(id);
+        if (st[sb + H_FIT] == FIT_INVALID) {
+            continue;
+        }
+        e_id[n] = id;
+        e_fit[n] = st[sb + H_FIT];
+        e_a[n] = st[sb + H_FP0];
+        e_b[n] = st[sb + H_FP1];
+        n++;
+    }
+    // Insertion sort by (size, fingerprint). It is stable, so equal entries keep their order.
+    for (uint i = 1u; i < n; i++) {
+        uint id = e_id[i];
+        uint f = e_fit[i];
+        uint a = e_a[i];
+        uint b = e_b[i];
+        uint k = i;
+        while (k > 0u && (e_fit[k - 1u] > f || (e_fit[k - 1u] == f && (e_a[k - 1u] > a || (e_a[k - 1u] == a && e_b[k - 1u] > b))))) {
+            e_id[k] = e_id[k - 1u];
+            e_fit[k] = e_fit[k - 1u];
+            e_a[k] = e_a[k - 1u];
+            e_b[k] = e_b[k - 1u];
+            k--;
+        }
+        e_id[k] = id;
+        e_fit[k] = f;
+        e_a[k] = a;
+        e_b[k] = b;
+    }
+    uint picked = 0u;
+    bool used[POOL];
+    for (uint s = 0u; s < uint(POOL); s++) {
+        used[s] = false;
+    }
+    uint first_a[POP];
+    uint first_b[POP];
+    for (uint i = 0u; i < n && picked < uint(POP); i++) {
+        bool duplicate = false;
+        for (uint m = 0u; m < picked; m++) {
+            if (first_a[m] == e_a[i] && first_b[m] == e_b[i]) {
+                duplicate = true;
+                break;
+            }
+        }
+        if (duplicate) {
+            continue;
+        }
+        first_a[picked] = e_a[i];
+        first_b[picked] = e_b[i];
+        st[ST_POP + picked] = e_id[i];
+        used[e_id[i]] = true;
+        picked++;
+    }
+    st[ST_CTL + C_NVALID] = picked;
+    if (picked > 0u) {
+        uint best = e_fit[0];
+        if (best < st[ST_CTL + C_BEST]) {
+            st[ST_CTL + C_BEST] = best;
+        }
+    }
+    uint f = 0u;
+    for (uint s = 0u; s < uint(POOL); s++) {
+        if (!used[s]) {
+            st[ST_FREE + f] = s;
+            f++;
+        }
+    }
+    st[ST_CTL + C_GEN] += 1u;
+
+    // The archive: the best admitted program of each distinct raw-written set, up to ARCHIVE of them.
+    uint arch_n = st[ST_CTL + C_ARCHIVED];
+    uint a_fit[ARCHIVE];
+    uint a_d0[ARCHIVE];
+    uint a_d1[ARCHIVE];
+    for (uint a = 0u; a < arch_n; a++) {
+        uint sb = slot_base(uint(SLOT_ARCH) + a);
+        a_fit[a] = st[sb + H_FIT];
+        a_d0[a] = st[sb + H_DFP0];
+        a_d1[a] = st[sb + H_DFP1];
+    }
+    uint actions = 0u;
+    for (uint j = 0u; j < ncand; j++) {
+        uint id = st[ST_CAND + j];
+        uint sb = slot_base(id);
+        uint fit = st[sb + H_FIT];
+        if (fit == FIT_INVALID) {
+            continue;
+        }
+        uint d0 = st[sb + H_DFP0];
+        uint d1 = st[sb + H_DFP1];
+        uint target = 0xFFFFFFFFu;
+        for (uint a = 0u; a < arch_n; a++) {
+            if (a_d0[a] == d0 && a_d1[a] == d1) {
+                if (fit < a_fit[a]) {
+                    target = a;
+                } else {
+                    target = 0xFFFFFFFEu;
+                }
+                break;
+            }
+        }
+        if (target == 0xFFFFFFFFu) {
+            if (arch_n < uint(ARCHIVE)) {
+                target = arch_n;
+                arch_n++;
+            } else {
+                uint worst = 0u;
+                for (uint a = 1u; a < arch_n; a++) {
+                    if (a_fit[a] > a_fit[worst]) {
+                        worst = a;
+                    }
+                }
+                if (fit < a_fit[worst]) {
+                    target = worst;
+                }
+            }
+        }
+        if (target >= uint(ARCHIVE)) {
+            continue;
+        }
+        a_fit[target] = fit;
+        a_d0[target] = d0;
+        a_d1[target] = d1;
+        sh_src[actions] = id;
+        sh_dst[actions] = target;
+        actions++;
+    }
+    st[ST_CTL + C_ARCHIVED] = arch_n;
+    sh_actions = actions;
+}
+
+void main() {
+    uint tid = gl_LocalInvocationID.x;
+    if (tid == 0u) {
+        decide();
+    }
+    memoryBarrierBuffer();
+    barrier();
+    uint actions = sh_actions;
+    for (uint k = 0u; k < actions; k++) {
+        uint from = slot_base(sh_src[k]);
+        uint to = slot_base(uint(SLOT_ARCH) + sh_dst[k]);
+        for (uint w = tid; w < uint(SLOT_HDR); w += uint(WORKGROUP)) {
+            st[to + w] = st[from + w];
+        }
+        uint nops = st[from + H_NOPS];
+        uint next = st[from + H_NEXT];
+        for (uint w = tid; w < nops * uint(OPW); w += uint(WORKGROUP)) {
+            st[to + uint(SLOT_OPS) + w] = st[from + uint(SLOT_OPS) + w];
+        }
+        for (uint w = tid; w < next * 2u; w += uint(WORKGROUP)) {
+            st[to + uint(SLOT_EXT) + w] = st[from + uint(SLOT_EXT) + w];
+        }
+    }
+}

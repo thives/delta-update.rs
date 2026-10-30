@@ -1,0 +1,35 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+// The bit maps: for every byte of the new image, one bit saying the old image holds the same byte
+// there, and one saying the new byte is zero. The mismatch scan reads these instead of the images
+// wherever a run is the old image at its own place, or zeros, which is most of an update, and so
+// compares 32 bytes per word read.
+#include "layout.glsl"
+#include "common.glsl"
+
+void main() {
+    images_init();
+    uint nl = P(P_NEW_LEN);
+    uint ol = P(P_OLD_LEN);
+    uint words = (nl + 31u) / 32u;
+    uint eq_base = P(P_EQ_BITS);
+    uint zero_base = P(P_ZERO_BITS);
+    uint step = gl_NumWorkGroups.x * uint(WORKGROUP);
+    for (uint w = gl_GlobalInvocationID.x; w < words; w += step) {
+        uint eq = 0u;
+        uint zero = 0u;
+        uint base = w * 32u;
+        uint end = min(32u, nl - base);
+        for (uint i = 0u; i < end; i++) {
+            uint nb = new_byte(base + i);
+            if (nb == 0u) {
+                zero |= 1u << i;
+            }
+            if (base + i < ol && old_byte(base + i) == nb) {
+                eq |= 1u << i;
+            }
+        }
+        ix[eq_base + w] = eq;
+        ix[zero_base + w] = zero;
+    }
+}

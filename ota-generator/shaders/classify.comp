@@ -1,0 +1,32 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+// Classify each GRID-byte cell of the new image: bit 0 when the old image holds exactly the same
+// bytes there, bit 1 when the new bytes are all zero. A cell that is not wholly inside the old
+// image is never equal, since the bytes past the old image are unknown, not zero.
+#include "layout.glsl"
+#include "common.glsl"
+
+void main() {
+    images_init();
+    uint cells = P(P_NCELLS);
+    uint nl = P(P_NEW_LEN);
+    uint ol = P(P_OLD_LEN);
+    uint classes = P(P_CLASSES);
+    uint step = gl_NumWorkGroups.x * uint(WORKGROUP);
+    for (uint g = gl_GlobalInvocationID.x; g < cells; g += step) {
+        uint a = g * uint(GRID);
+        uint b = min(a + uint(GRID), nl);
+        bool equal = b <= ol;
+        bool zero = true;
+        for (uint p = a; p < b && (equal || zero); p++) {
+            uint nb = new_byte(p);
+            if (nb != 0u) {
+                zero = false;
+            }
+            if (equal && old_byte(p) != nb) {
+                equal = false;
+            }
+        }
+        ix[classes + g] = (equal ? uint(CELL_EQUAL) : 0u) | (zero ? uint(CELL_ZERO) : 0u);
+    }
+}

@@ -1,0 +1,28 @@
+[package]
+name = "ota-payload"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+edition = "2021"
+description = "Wire-compatible update_engine payload format, signing and verification (no_std + alloc)."
+
+[dependencies]
+rsa = { version = "0.9", default-features = false, features = ["pem", "sha2", "u64_digit"] }
+sha2 = { version = "0.11" }
+# protobuf messages are generated from the golden schema by prost-build
+# (see build.rs + src/lib.rs); prost itself stays std-free via
+# default-features = false.
+prost = { version = "0.14", default-features = false, features = ["derive"] }
+# zlib *decoding* of single blocks (`encoding`): the tinfl core, which needs no
+# allocation and writes into a caller-provided block. Encoding lives in the
+# generator, which enables `with-alloc`.
+miniz_oxide = { version = "0.9", default-features = false }
+
+[build-dependencies]
+prost-build = "0.14"
+
+[dev-dependencies]
+# Test vectors are produced by the same encoder the generator uses.
+miniz_oxide = { version = "0.9", features = ["with-alloc"] }
+
+[features]
+default = []

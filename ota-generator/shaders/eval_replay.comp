@@ -1,0 +1,35 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+// Evaluation, step 1: check each candidate's counts and replay it on the memory model.
+// One thread per candidate. A candidate that fails keeps its reason in its header, and the later
+// steps pass it over.
+#include "layout.glsl"
+#define LOCAL_SIZE 1
+#include "common.glsl"
+#include "program.glsl"
+#include "replay.glsl"
+
+void main() {
+    uint j = gl_GlobalInvocationID.x;
+    if (j >= pc.a0) {
+        return;
+    }
+    uint sb = slot_base(st[ST_CAND + j]);
+    if (st[sb + H_STATUS] != uint(S_OK)) {
+        return;
+    }
+    if (p_nops(sb) > min(P(P_MAX_OPS), uint(OP_CAP)) || p_next(sb) > P(P_MAX_EXT_TOTAL)) {
+        st[sb + H_STATUS] = uint(S_LIMIT);
+        return;
+    }
+    r_attach(runs_base(j));
+    uint blob;
+    uint why = replay(sb, blob);
+    if (why != uint(S_OK)) {
+        st[sb + H_STATUS] = why;
+        return;
+    }
+    r_settle();
+    st[sb + H_RUNS] = rn;
+    st[sb + H_BLOB] = blob;
+}

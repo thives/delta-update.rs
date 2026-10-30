@@ -1,0 +1,21 @@
+{
+  "name": "update-engine",
+  "build": {
+	"dockerfile": "./Dockerfile",
+	"context": "."
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": "true",
+      "username": "ubuntu",
+      "upgradePackages": "true",
+      "configureZshAsDefaultShell": "true"
+    },
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "latest",
+      "ppa": "false"
+    }
+  },
+  "remoteUser": "ubuntu",
+  "privileged": true,
+}

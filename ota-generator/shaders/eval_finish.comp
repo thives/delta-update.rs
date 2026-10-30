@@ -1,0 +1,71 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+// Evaluation, step 5: the exact payload size and the fingerprints of each candidate, and the
+// count of why candidates were refused. A candidate that survives has a fitness; the others have
+// FIT_INVALID, and selection passes them over.
+#include "layout.glsl"
+#define LOCAL_SIZE 1
+#include "common.glsl"
+#include "program.glsl"
+#include "size.glsl"
+
+void main() {
+    uint j = gl_GlobalInvocationID.x;
+    if (j >= pc.a0) {
+        return;
+    }
+    uint sb = slot_base(st[ST_CAND + j]);
+    uint status = st[sb + H_STATUS];
+    st[sb + H_FIT] = FIT_INVALID;
+    if (status == uint(S_SKIP)) {
+        ctl_add(C_SKIPPED, 1u);
+        return;
+    }
+    ctl_add(C_EVALS, 1u);
+    if (status == uint(S_OK)) {
+        uint size;
+        uint blob;
+        status = raw_size(sb, size, blob);
+        if (status == uint(S_OK)) {
+            st[sb + H_FIT] = size;
+            st[sb + H_BLOB] = blob;
+            uint nops = p_nops(sb);
+            fp_reset();
+            fp_word(nops);
+            for (uint i = 0u; i < nops; i++) {
+                fp_word(o_kind(sb, i));
+                uint dn = o_dn(sb, i);
+                uint sn = o_sn(sb, i);
+                fp_word(dn);
+                fp_word(sn);
+                for (uint e = 0u; e < dn; e++) {
+                    fp_word(x_start(sb, o_dfirst(sb, i) + e));
+                    fp_word(x_len(sb, o_dfirst(sb, i) + e));
+                }
+                for (uint e = 0u; e < sn; e++) {
+                    fp_word(x_start(sb, o_sfirst(sb, i) + e));
+                    fp_word(x_len(sb, o_sfirst(sb, i) + e));
+                }
+            }
+            st[sb + H_FP0] = fp_a;
+            st[sb + H_FP1] = fp_b;
+            // The raw-written bytes alone: what a compressor would see.
+            fp_reset();
+            for (uint i = 0u; i < nops; i++) {
+                if (o_kind(sb, i) == uint(K_REPLACE)) {
+                    fp_word(0xA5A5A5A5u);
+                    for (uint e = 0u; e < o_dn(sb, i); e++) {
+                        fp_word(x_start(sb, o_dfirst(sb, i) + e));
+                        fp_word(x_len(sb, o_dfirst(sb, i) + e));
+                    }
+                }
+            }
+            st[sb + H_DFP0] = fp_a;
+            st[sb + H_DFP1] = fp_b;
+        }
+    }
+    st[sb + H_STATUS] = status;
+    if (status != uint(S_OK)) {
+        ctl_add(uint(C_REJ) + status, 1u);
+    }
+}
