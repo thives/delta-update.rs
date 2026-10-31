@@ -995,6 +995,17 @@ pub struct Finalist {
     pub raw_size: u64,
 }
 
+/// A seeding candidate as the seed stage wrote it: the program, and the status the writer left. A
+/// seed is valid when its status is `S_OK`, which means the writer had room for every operation.
+/// `searched` counts the changed cells the greedy seed entered the source-table matcher for. Only the
+/// greedy seed writes it, so it means nothing for the other seeding candidates.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Seed {
+    pub program: Vec<Op>,
+    pub status: u32,
+    pub searched: u32,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct Tables {
     stride: usize,
@@ -1092,6 +1103,8 @@ pub struct Session {
     tables: Tables,
     stats: SessionStats,
     next_generation: u32,
+    /// Population restarts so far. Each restart's immigrants come from the stream of its own number.
+    restarts: u32,
 }
 
 fn words_of(bytes: usize) -> usize {
@@ -1210,6 +1223,7 @@ impl Session {
             tables: tables,
             stats: stats,
             next_generation: 1,
+            restarts: 0,
         };
         let handles = [session.state.handle(), session.images.handle()];
         let sizes = [ST_SCAN * 4, session.images.bytes];
@@ -1607,14 +1621,15 @@ impl Session {
     }
 
     /// Re-seed the population with the archive and deterministic immigrants after a plateau.
-    /// The archive is retained as the set of elites, while immigrants are generated using the
-    /// current global generation so consecutive restarts do not repeat the same proposals.
+    /// The archive is retained as the set of elites. The immigrants come from the restart's own
+    /// stream (see [`restart_proposals`](Self::restart_proposals)), so they do not depend on the
+    /// generation count, and consecutive restarts propose different programs.
     pub fn restart_from_archive(&mut self) -> Result<Counters, PayloadError> {
         let previous = self.counters()?;
         let previous_ctl = self.download(Which::State, ST_CTL, CTL_WORDS)?;
         let generation = self.next_generation;
         let archive = self.finalists()?;
-        let proposals = self.breed_only(generation, 1, 0)?;
+        let proposals = self.restart_proposals()?;
         let mut programs: Vec<Vec<Op>> = archive.into_iter().map(|f| f.program).collect();
         for program in proposals.into_iter().flatten() {
             if programs.len() >= NCAND {
@@ -1643,6 +1658,17 @@ impl Session {
         return self.counters();
     }
 
+    /// The immigrants of the next restart, one per child as bred, before any evaluation. Each restart
+    /// is numbered in sequence and draws from a stream of its own, so the proposals depend only on the
+    /// seed and the restart sequence: the same seed reproduces them in a fresh session, and they are not
+    /// tied to the generation count. Consecutive restarts propose different programs. Calling this uses
+    /// up a restart number, so a [`restart_from_archive`](Self::restart_from_archive) that follows loads
+    /// the proposals of the restart after these.
+    pub fn restart_proposals(&mut self) -> Result<Vec<Option<Vec<Op>>>, PayloadError> {
+        self.restarts += 1;
+        return self.breed_stream(0, self.restarts, 1, 0);
+    }
+
     /// Breed one generation of children from the current population and return them as bred, before
     /// any evaluation: `None` for a child that was an unchanged parent and is skipped. `how` forces
     /// how children are made (0 as the search does, 1 immigrants only, 2 crossover only, 3 mutation
@@ -1655,10 +1681,23 @@ impl Session {
         how: u32,
         mv: u32,
     ) -> Result<Vec<Option<Vec<Op>>>, PayloadError> {
+        return self.breed_stream(generation, 0, how, mv);
+    }
+
+    /// [`breed_only`](Self::breed_only) on the stream of `sequence`. Sequence zero is the ordinary
+    /// generation's stream; a restart uses its own nonzero sequence, so no two restarts and no
+    /// restart and generation share a stream.
+    fn breed_stream(
+        &mut self,
+        generation: u32,
+        sequence: u32,
+        how: u32,
+        mv: u32,
+    ) -> Result<Vec<Option<Vec<Op>>>, PayloadError> {
         self.gpu.submit(|b| {
             b.dispatch(
                 Stage::Breed,
-                [generation, mv, how, 0, 0],
+                [generation, mv, how, sequence, 0],
                 CHILDREN as u32,
                 1,
             )
@@ -1810,7 +1849,39 @@ impl Session {
             return Ok(());
         })?;
         self.next_generation = 1;
+        self.restarts = 0;
         return self.counters();
+    }
+
+    /// The seeding generation's candidates as the seed stage wrote them, before any evaluation, each
+    /// with the status the writer left. The search runs the same stage in [`prepare`](Self::prepare).
+    /// A diagnostic: it replaces the candidate slots and clears the control counters, as
+    /// [`evaluate`](Self::evaluate) does. The session must have been prepared, since the tables come
+    /// from there.
+    pub fn seeds(&mut self) -> Result<Vec<Seed>, PayloadError> {
+        self.gpu.submit(|b| {
+            b.dispatch(Stage::InitState, [0; PUSH_WORDS], 1, 1)?;
+            return b.dispatch(Stage::Seed, [0; PUSH_WORDS], NCAND as u32, 1);
+        })?;
+        let ids: Vec<u32> = (0..NCAND as u32).collect();
+        let mut out: Vec<Seed> = Vec::new();
+        for slot in self.read_slots(&ids)? {
+            let program = match decode_program(&slot) {
+                None => {
+                    return Err(err(
+                        Code::device_io,
+                        "the device returned a malformed seed",
+                    ));
+                }
+                Some(p) => p,
+            };
+            out.push(Seed {
+                status: slot.word(H_STATUS),
+                program: program,
+                searched: slot.word(H_SEARCHED),
+            });
+        }
+        return Ok(out);
     }
 
     /// Run one generation a stage at a time and return the host-measured time of each, in order. It is

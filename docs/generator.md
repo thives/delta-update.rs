@@ -546,7 +546,7 @@ flowchart TD
     RP --> SC[scan the target against the new image: mismatch spans per range]
     SC --> RE[repair: append one raw REPLACE over the mismatches, if permitted]
     RE --> FT[exact raw size and admission checks]
-    FT --> SEL[select: elites + admitted children, best 24 distinct]
+    FT --> SEL[select: elites + admitted children, best 24 structurally distinct]
     SEL --> AR[archive: best program per distinct raw-written set]
     AR --> G
 ```
@@ -554,8 +554,8 @@ flowchart TD
 ### 7.1 Population, elites and children
 
 The population keeps `POP` = 24 programs. Each generation keeps its best `ELITES` = 3 unchanged and
-breeds `CHILDREN` = 96 more. The next population is the best 24 distinct programs of those 99. The
-numbers 24 and 3 are the earlier search's, kept so that this rewrite changes the architecture and not
+breeds `CHILDREN` = 96 more. The next population is the best 24 structurally distinct programs of those 99
+(§7.2). The numbers 24 and 3 are the earlier search's, kept so that this rewrite changes the architecture and not
 the evolutionary schedule. The number of children is not, and it is the one place where the device
 changes the schedule on purpose: a child costs one thread, the device has hundreds of them, and 96
 children cost little more wall time than 21 did, so the search evaluates about four times as many
@@ -584,8 +584,10 @@ flowchart LR
 ```
 
 A child is written into a free slot. Selection sorts the elites and the admitted children by raw size,
-then structural fingerprint for ordering, and drops duplicates by the fingerprint of raw-written bytes
-(`DFP`), matching the archive's equivalence rule. It keeps 24; every other slot becomes free. A move writes a
+then structural fingerprint for ordering, and drops structural duplicates: programs whose operations and
+extents are identical (`FP`). Programs that write the same bytes raw but copy or zero them differently are
+not duplicates, so both stay available for breeding. Only the archive merges by the raw-written fingerprint
+(`DFP`, §7.8). It keeps 24; every other slot becomes free. A move writes a
 child by **reading a parent and appending to the child front to back** through a writer, never by
 shifting data in place, so a child is always packed: its operations in order, and each operation's
 extents contiguous. The writer checks every capacity before it writes; when one runs out it sets a flag
@@ -601,12 +603,33 @@ The seeding generation evaluates `NCAND` candidates:
 | 0 | the raw replacement of the whole new image: one `REPLACE` |
 | 1 | the **compact** program: one operation per run of changed cells, `ZERO` where the new bytes are zero |
 | 2 | the **empty** program, which the repair turns into exactly the changed bytes |
-| 3 | a greedy seed: one guided old-image copy proposal per changed cell, with raw/zero fallback |
+| 3 | a greedy seed: one piece per changed cell, a guided old-image copy where the source table has one, otherwise the cell's new bytes, zero or raw |
 | 4.. | random immigrants |
 
-The greedy seed reuses the guided source-table matcher. Its bounded cell proposals are repaired by
-the ordinary evaluation path, so every candidate still receives the same admission and correctness
-checks. The earlier search had a sparse seed and a compressed compact seed; those are encodings, and
+The greedy seed reuses the guided source-table matcher, and it is bounded in four ways. It is one
+proposal, so it compares within `MAX_COMPARE` in all, and it probes the source tables at most `MAX_LOOKUPS`
+(16,384) times in all, hit or miss. A probe is a binary search whether or not anything matches, so a cell
+with no match costs its probes without a comparison, and the lookup bound is what keeps an image of unrelated
+bytes from spending the seed's work. Once either budget is spent, the remaining cells are written raw or
+zero, and the matcher is not entered for them at all, so their hashes are not computed either. A copy is
+looked for only where the profile admits two extents in one operation (`P_MAX_EXT_OP`), and it is chosen only
+where it fits the operations and extents left; a copy that does not fit gives way to the cell's own bytes.
+Adjacent pieces of one kind that continue each other join into one operation, so a run of changed cells of
+one kind costs one operation however long it is. A seed that covers every changed cell needs no repair, so it
+may use all of the profile's operations and extents. A copy shorter than its cell leaves the rest of that cell
+unwritten, and the seed keeps it only where that rest is already right: where the old image, which the target
+starts as, holds the same bytes. The check compares the rest with the old image within the same comparison
+budget, and a rest that runs past the end of the old image, or that the budget cannot cover, is not shown to
+be right and counts as wrong. Then the whole cell is written raw or zero, which needs no repair. The seed does
+not keep a short copy and reserve room for repairing its rest, because it cannot predict that repair: a rest
+that differs from the old image in several runs repairs as one operation of as many extents, which a tight
+profile refuses. A short copy that is kept leaves nothing behind, so it needs no reserve and may use the
+profile's last operation. Only a seed that stops early leaves bytes to the repair: its next piece does not
+fit, so the rest of the changed cells is the repair's, its last pieces give way if they must, and it keeps one
+operation and one extent back for the repair. The evaluation then refuses the seed if the repair cannot fit.
+Every candidate still receives the same admission and correctness checks, so a seed the repair cannot finish is
+refused like any other program.
+The earlier search had a sparse seed and a compressed compact seed; those are encodings, and
 the encoding pass makes them from the raw programs (§9.1). The raw replacement is always the first
 candidate, so a valid program exists the moment the first generation is evaluated, subject to the
 profile admitting it.
@@ -691,10 +714,12 @@ disjoint from the destination.
 ### 7.6 Randomness and determinism
 
 Each child draws from its own stream: a PCG generator seeded by a hash of the seed, the generation
-and the child's index. Within a device, a generation-capped run is reproducible independently of its
-batching. Results are not required to match across devices: guided seed and move proposals may select
-different valid sources. The software and hardware tests therefore validate finalists independently
-against the CPU evaluator rather than comparing their search trajectories.
+and the child's index. A restart's immigrants draw from streams numbered by the restart sequence instead
+(§8.4), so they depend on the seed and the number of restarts, not on the generation. Within a device, a
+generation-capped run is reproducible independently of its batching. Results are not required to match
+across devices: guided seed and move proposals may select different valid sources, although the pinned
+fixed-generation payload (§11) comes out the same on both. The software and hardware tests therefore
+validate finalists independently against the CPU evaluator rather than comparing their search trajectories.
 
 ### 7.7 Evaluation
 
@@ -741,7 +766,8 @@ distinct set of *raw-written bytes*. Two programs that write the same bytes raw 
 keeping the better raw program of each set spends the archive on programs that differ in what the
 encoder will see. Selection offers each admitted child to the archive and replaces the worst entry
 when a child is better; the copy into an archive slot is done by the whole work group. The archive is
-what the host reads when the search ends; it is sorted best first.
+what the host reads when the search ends; it is sorted best first. The population does not use this key:
+it drops only structural duplicates (§7.2), so programs that differ in their copies stay available for breeding.
 
 ### 7.9 What one candidate may cost
 
@@ -755,6 +781,10 @@ that is bounded:
 | runs in the replay | `RUN_CAP` = 16,384 | refused: `run workspace exhausted` |
 | run moves and merged pieces in the replay | `REPLAY_BUDGET` = 2^20 | refused: `replay work budget exhausted` |
 | bytes compared by one proposal | `MAX_COMPARE` = 256 KiB | the proposal fails; the parent is kept |
+| bytes compared by the greedy seed, in all | `MAX_COMPARE` = 256 KiB | the seed makes no more copies; its cells are written raw or zero |
+| source-table probes by the greedy seed, in all, hit or miss | `MAX_LOOKUPS` = 16,384 | the seed makes no more guided lookups; its cells are written raw or zero |
+| bytes compared by the greedy seed to check the rest of a short copy | the seed's `MAX_COMPARE` above | a rest not shown to match the old image (a mismatch, the end of the old image, or the budget) is taken as wrong: the copy gives way to its whole cell, raw or zero |
+| operations and extents the greedy seed writes | the profile's and `OP_CAP` | a complete seed may use all of them; a seed that stops early leaves bytes to the repair and keeps one operation and one extent for it |
 | bytes scanned by one thread of the scan | the image over at most 1,024 ranges | by construction |
 | sum of lengths in a program | `SUM_LIMIT` = 2^31 - 1 | refused: `length overflow` |
 
@@ -812,19 +842,29 @@ optimizes. Let `best(t)` be the best size known at time `t`:
 
 ```text
 progress = best(now − window) − best(now)
-stop if now ≥ window and progress < min_improvement_bytes
+stop if a generation has run since the last restart, now − restart ≥ window, and progress < min_improvement_bytes
 ```
+
+`restart` is the time of the last population restart, or zero when there has been none (§8.4). Nothing
+before a restart counts toward its window, so the search cannot be called stagnant until a full window has
+elapsed since the restart. Once it has, the window slides as before. The rule is not consulted at all until
+a generation has run on the restarted population, so a window that expires between two reads of the clock
+still gives the restart its generation. The deadline and the generation cap are checked separately, and
+neither waits for that generation.
 
 ### 8.4 Plateau restarts
 
 Stagnation is measured on the best raw size using the full rolling window in §8.3. On a stagnant
 window, the session restarts its population from the archived finalists plus deterministic immigrants.
-Immigrants use the next global generation number, so repeated restarts do not repeat the same random
-proposals. The archive survives as the elite seed, and the generation count continues across restarts.
-The progress window is reset at each restart without erasing the reported improvement history. Any
-new best raw size resets the consecutive-restart count. The search stops with `Stop::Stagnation` only
-after three consecutive restarts have failed to produce an improvement; the deadline and generation
-cap remain independent upper bounds.
+Each restart is numbered in sequence from one, and its immigrants draw from a stream of that number, so
+they depend only on the seed and the restart count. Consecutive restarts propose different programs, and
+a fresh session with the same seed repeats them whatever its generation count. The archive survives as the
+elite seed, and the generation count continues across restarts. Each restart opens a new progress window at
+its own time, and its population must run a generation before the stagnation rule may stop the search
+(§8.3), so no restart is followed by a stagnation stop without a generation between them. The restart's best raw size is recorded in the history like any improvement, so the reported history is not
+erased. Any new best raw size resets the consecutive-restart count. The search stops with `Stop::Stagnation`
+only after three consecutive restarts have failed to produce an improvement; the deadline and generation
+cap remain independent upper bounds. `Found::restarts` counts every restart.
 
 Raw size is used because the final compressed payload is chosen after the search. Measuring compressed
 progress inside the loop would require CPU encoding on every candidate, which the GPU search avoids.
@@ -1077,6 +1117,41 @@ rest:
 - a clock that moves a fixed step per read places the deadline at a known batch, and every stop returns
   programs the client accepts; the stop reasons, the progress history and the refusal of invalid time
   settings are checked; a zero budget opens no device and reads the clock a bounded number of times;
+- a restart is not stagnant until a full window has elapsed since it, at the restart, half a window after
+  it and just before the window expires; each restart opens its own window; the window slides after it;
+  and the restart's best joins the history (`control.rs`, unit tests). A restarted population must run a
+  generation before it can be called stagnant, even when the window has expired
+  (`a_restarted_population_must_run_a_generation_before_it_can_be_stagnant`). With a clock that moves a second
+  per read, so that every window expires between reads, each restart of a search is followed by a generation
+  (`a_window_that_expires_between_reads_still_gives_each_restart_a_generation`), and a search that restarts
+  runs at least one generation after each restart (`stagnation_restarts_the_population_before_ending_the_search`);
+  the generation cap and the deadline still end a search that restarts, since neither waits for that generation,
+  and a deadline that falls after a restart and before its generation stops the search there, after exactly one
+  restart and no generation, as the clock's reads place it
+  (`the_generation_cap_and_the_deadline_still_stop_a_search_that_restarts`);
+- a restart's immigrants come from a stream of their own: consecutive restarts differ, and a fresh session
+  with the same seed repeats them whatever its generation count
+  (`consecutive_restarts_propose_different_immigrants`,
+  `a_fresh_session_repeats_the_restart_sequence_whatever_its_generations`);
+- the greedy seed copies a relocated range from its source; joins 600 changed cells into one operation;
+  stops at its operation bound and leaves the rest to the repair; stops copying once its comparison budget is
+  spent; makes no probe past its lookup bound, although a copy at the start of the same image is found, and
+  enters the matcher for exactly the cells its lookups cover (`Seed::searched`), so the cells past the bound are
+  not hashed (`the_greedy_seed_makes_no_probe_past_its_lookup_bound`); a complete single copy fits one operation
+  and exactly its two extents, a copy the extents cannot admit gives way to raw bytes, a partial seed leaves one
+  operation for the repair, and a profile of one extent per operation gets raw bytes
+  (`a_complete_single_copy_seed_*`, `a_copy_the_extents_cannot_admit_*`, `a_partial_seed_leaves_*`,
+  `a_profile_with_one_extent_*`); a short copy whose rest is already right is kept under a profile of one
+  operation and repairs nothing (`a_short_copy_whose_rest_is_already_right_*`); a short copy whose rest differs
+  from the old image in several runs gives way to its whole cell under a tight extent limit, and is admitted
+  without a repair (`a_short_copy_with_a_fragmented_rest_*`); and a rest that runs past the old image, or that
+  the comparison budget cannot cover, is not assumed right: the same image with the block held once keeps its
+  copy, and held twice, so that finding the copy spends the budget the rest needed, writes its cell whole
+  (`a_short_copy_whose_rest_runs_past_*`, `a_short_copy_whose_rest_cannot_be_compared_*`); and every seed it
+  writes is evaluated with its repair (`the_greedy_seed_*`, `a_run_of_changed_cells_*`);
+- programs that write the same bytes raw but copy them differently all stay in the population, structurally
+  identical programs collapse, and the archive keeps one program per raw-written set
+  (`programs_that_write_the_same_bytes_raw_but_copy_them_differently_all_stay_in_the_population`);
 - the raw seed, a one-byte update under a profile that refuses the raw replacement, a profile that
   admits `ZERO` and not the raw replacement, and a profile with no admissible candidate (which reports
   the budget) still behave as they did;
@@ -1109,9 +1184,13 @@ print the cost of the cut (§18.2).
 range does.
 
 **Pinned payload** (`tests/search.rs`, `a_fixed_generation_search_reproduces_its_recorded_payload`): a
-64 KiB pair searched for 40 generations gives 2,276 bytes with a fixed digest. The value was recorded from
-HEAD and matches on the software and the hardware device, so a change in what the generator writes fails
-here, while a change in how fast it writes does not.
+64 KiB pair searched for 40 generations gives 1,183 bytes with a fixed digest. The value is the one the
+seed bounds, restart streams, structural selection and short-copy rule of this revision produce, and it matches
+on the software and the hardware device. The short-copy rule (§7.2) alone moved it from 1,313 bytes: with the
+reserve it replaced, the same revision gives 1,313 on the software device. An earlier pin, 1,660 bytes, did not
+match HEAD on either device, and the two devices disagreed there. The greedy seed read an uninitialized
+comparison budget, which is the likely cause; the fixed seed agrees on both. So a change in what the generator
+writes fails here, while a change in how fast it writes does not.
 
 **The device layer** (`src/gpu.rs`, `src/gpu_layout.rs`): the fallback order and the attempts recorded
 on failure (a failure is injected, not a broken driver), software-only selection, the memory-type
@@ -1598,8 +1677,8 @@ OTA_MATRIX_SEEDS=1,2 OTA_MATRIX_GENERATIONS=20 OTA_TEST_DEVICE=auto \
 ```
 
 **Equality.** All 36 builds have the same payload length and digest before and after, and the same trial
-count. The pinned payload of §11 is 2,276 bytes with the same digest at HEAD and here, on the software and
-the hardware device.
+count. The pinned payload of §11 was 2,276 bytes with the same digest before and after that change, on the
+software and the hardware device. §11 now records the value of the later seed and selection revision.
 
 **Work.** Whole-program replays per build, and encoding seconds per build, averaged over the four builds of
 each workload (two profiles, two seeds). The search time is unchanged in every workload (the device
@@ -1958,7 +2037,7 @@ interleaved comparisons above are cited.
 - Exact profile and varint boundaries: `analysed_trials_size_the_manifest_across_the_varint_boundaries`,
   `sizes_agree_at_every_varint_boundary` (`tests/gpu_eval.rs`).
 - Pinned payload reproducibility: `a_fixed_generation_search_reproduces_its_recorded_payload`
-  (`tests/search.rs`, 2,276 bytes), and the matrix digests above.
+  (`tests/search.rs`, 1,183 bytes), and the matrix digests above.
 - Cursor against `slice_stream`: `the_chunk_cursor_cuts_exactly_as_slice_stream_does` and
   `the_checked_cut_is_the_iterator_cut_under_an_unbounded_control`, over unsorted, overlapping, repeated and
   zero-length extents.

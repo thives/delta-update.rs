@@ -62,6 +62,8 @@
 #define H_RUNS 12
 // Zero for non-mutations; otherwise the mutation ID plus one.
 #define H_MOVE 13
+// Changed cells the greedy seed entered the source-table matcher for. Only the greedy seed writes it.
+#define H_SEARCHED 14
 
 #define FIT_INVALID 4294967295u
 
@@ -215,9 +217,12 @@
 #define GUIDED_SHARE 60
 #define DATA_SHARE 60
 #define SCAN_WINDOW 65536
-// Bytes one proposal may compare in all, and the longest run of zeros one zero proposal measures.
+// Bytes one proposal may compare in all, the longest run of zeros one zero proposal measures, and the
+// source-table probes one proposal may make in all, hit or miss. A probe is a binary search of the table
+// whether or not anything matches, so the lookups are bounded apart from the bytes they compare.
 #define MAX_COMPARE 262144
 #define MAX_ZERO_RUN 1048576
+#define MAX_LOOKUPS 16384
 
 #define MV_SPLIT 0
 #define MV_MERGE 1

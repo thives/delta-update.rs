@@ -206,6 +206,13 @@ fn stagnation_restarts_the_population_before_ending_the_search() {
     let found = success(search::run(&problem, &config));
     let took = started.elapsed().as_secs_f64();
     assert_eq!(found.stop, delta_update_generator::Stop::Stagnation);
+    assert!(found.restarts >= 3, "the search stopped after {} restarts", found.restarts);
+    assert!(
+        found.generations >= u64::from(found.restarts),
+        "{} generations for {} restarts: a restarted population did not get to run",
+        found.generations,
+        found.restarts
+    );
     assert!(took < 10.0, "a stagnant search ran for {:.2} s", took);
 }
 
@@ -282,8 +289,8 @@ fn one_byte_chunks_build_and_pass_the_checks() {
     }
 }
 
-const RECORDED_LEN: usize = 1660;
-const RECORDED_DIGEST: [u8; 8] = [0x40, 0x81, 0xa3, 0x78, 0x78, 0x0c, 0x60, 0xc5];
+const RECORDED_LEN: usize = 1183;
+const RECORDED_DIGEST: [u8; 8] = [0x47, 0xf2, 0x45, 0x3b, 0x83, 0xc7, 0x17, 0x51];
 
 #[test]
 fn a_fixed_generation_search_reproduces_its_recorded_payload() {

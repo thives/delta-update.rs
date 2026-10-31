@@ -38,7 +38,9 @@ void main() {
     uint chd = slot_base(id);
     uint scr0 = slot_base(uint(SLOT_SCR) + 2u * j);
     uint scr1 = slot_base(uint(SLOT_SCR) + 2u * j + 1u);
-    R = rng_seed(P(P_SEED0), P(P_SEED1), pc.gen, j);
+    // Push a2 is the restart sequence: zero for ordinary breeding, and a restart's own number, which
+    // offsets the child index so that no two restarts share a stream. Zero leaves the stream unchanged.
+    R = rng_seed(P(P_SEED0), P(P_SEED1), pc.gen, j + pc.a2 * uint(CHILDREN));
     members = st[ST_CTL + C_NVALID];
     // Push a1 forces how children are made, and a0 forces which move a mutation makes (plus one).
     // The search leaves both zero, and the tests use them to reach one operator at a time.

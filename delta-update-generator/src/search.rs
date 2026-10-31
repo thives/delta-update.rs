@@ -217,6 +217,8 @@ pub struct Found {
     pub stop: Stop,
     /// Generations the device ran after seeding.
     pub generations: u64,
+    /// Population restarts after a stagnant window.
+    pub restarts: u32,
     /// The device's counters at the end: candidates evaluated, and why others were refused.
     pub counters: Counters,
     /// `(seconds, raw size)` at each improvement of the best raw size the host saw.
@@ -237,6 +239,7 @@ impl Found {
             finalists: Vec::new(),
             stop: stop,
             generations: 0,
+            restarts: 0,
             counters: Counters::default(),
             history: Vec::new(),
             stats: SessionStats::default(),
@@ -302,6 +305,7 @@ pub fn run_with(
     record(&mut ctl, &counters);
     let mut per_generation = Duration::ZERO;
     let mut stagnation_restarts = 0u32;
+    let mut restarts = 0u32;
     let stop = loop {
         if ctl.generation_cap_reached() {
             break Stop::Generations;
@@ -323,9 +327,11 @@ pub fn run_with(
             } else {
                 stagnation_restarts += 1;
             }
+            restarts += 1;
+            // The restart opens a window, and its population must run a generation before the search
+            // can call it stagnant again, whatever the clock says about the window.
             ctl.reset_stagnation(counters.best as u64);
             per_generation = Duration::ZERO;
-            record(&mut ctl, &counters);
             continue;
         }
         let mut n = match batch {
@@ -366,6 +372,7 @@ pub fn run_with(
         finalists: finalists,
         stop: stop,
         generations: ctl.generations(),
+        restarts: restarts,
         counters: counters,
         history: ctl.history().to_vec(),
         stats: session.stats(),

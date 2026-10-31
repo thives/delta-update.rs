@@ -2,9 +2,11 @@
 #extension GL_GOOGLE_include_directive : enable
 // Select the next population, and keep the finalists.
 //
-// The next population is the elites of this one plus every admitted child, without duplicates,
-// best first. Children that were not admitted are passed over. The pool slots that no member
-// holds become the free list the next generation breeds into.
+// The next population is the elites of this one plus every admitted child, best first, without
+// structural duplicates: two programs are the same when their operations and extents are. Programs
+// that write the same bytes raw but copy or zero them differently are different members, so both can
+// be bred from. Children that were not admitted are passed over. The pool slots that no member holds
+// become the free list the next generation breeds into.
 //
 // Separately, the archive keeps the best programs ever admitted, one per distinct set of raw-written
 // bytes, because two programs that write the same bytes raw compress alike. The archive is what the
@@ -119,13 +121,12 @@ void decide() {
     for (uint s = 0u; s < uint(POOL); s++) {
         used[s] = false;
     }
-    uint first_d0[POP];
-    uint first_d1[POP];
+    uint first_a[POP];
+    uint first_b[POP];
     for (uint i = 0u; i < n && picked < uint(POP); i++) {
         bool duplicate = false;
         for (uint m = 0u; m < picked; m++) {
-            uint sb = slot_base(e_id[i]);
-            if (first_d0[m] == st[sb + H_DFP0] && first_d1[m] == st[sb + H_DFP1]) {
+            if (first_a[m] == e_a[i] && first_b[m] == e_b[i]) {
                 duplicate = true;
                 break;
             }
@@ -133,9 +134,8 @@ void decide() {
         if (duplicate) {
             continue;
         }
-        uint sb = slot_base(e_id[i]);
-        first_d0[picked] = st[sb + H_DFP0];
-        first_d1[picked] = st[sb + H_DFP1];
+        first_a[picked] = e_a[i];
+        first_b[picked] = e_b[i];
         st[ST_POP + picked] = e_id[i];
         used[e_id[i]] = true;
         picked++;

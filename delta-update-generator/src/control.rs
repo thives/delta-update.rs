@@ -11,7 +11,8 @@
 //!
 //! **Progress.** [`Progress`] keeps the best size at each improvement, with the time of that
 //! improvement. A stagnation check looks back over a full window: several small gains inside
-//! the window add up, and the window slides with the search.
+//! the window add up, and the window slides with the search. A population restart opens a new
+//! window at its own time, so the search gets a full window to make progress after it.
 
 use std::time::Instant;
 
@@ -83,12 +84,12 @@ impl From<PayloadError> for Halt {
 /// The result of a bounded step: its value, or why it did not produce one.
 pub type Step<T> = Result<T, Halt>;
 
-/// The best size at each improvement, with the time it was reached.
+/// The best size at each improvement, with the time it was reached, and the time of the last restart.
 pub struct Progress {
     window: f64,
     min_gain: u64,
     history: Vec<(f64, u64)>,
-    epoch: Option<(f64, u64)>,
+    restarted: Option<f64>,
 }
 
 impl Progress {
@@ -98,7 +99,7 @@ impl Progress {
             window: window,
             min_gain: min_gain,
             history: Vec::new(),
-            epoch: None,
+            restarted: None,
         };
     }
 
@@ -128,20 +129,30 @@ impl Progress {
         return &self.history;
     }
 
+    /// Open a stagnation window at `at` seconds, after a restart whose best size is `best`. The
+    /// restart's best is recorded like any other improvement, so the history keeps it.
+    pub fn restart(&mut self, at: f64, best: u64) {
+        self.restarted = Some(at);
+        self.record(at, best);
+    }
+
     /// Whether the search should stop at `now` seconds, with `best` as its best size. It
     /// stops once a full window has elapsed and the window reduced the best size by less
     /// than `min_gain`. A `min_gain` of zero disables this rule.
+    ///
+    /// A restart opens a window of its own: nothing before the last restart counts, so no check
+    /// can stop the search until a full window has elapsed since that restart.
     pub fn should_stop(&self, now: f64, best: u64) -> bool {
-        if self.min_gain == 0 || now < self.window {
+        if self.min_gain == 0 {
             return false;
         }
-        let window_start = now - self.window;
-        let base = match self.epoch {
-            Some((at, size)) if window_start < at => size,
-            _ => match self.best_at(window_start) {
-                None => return false,
-                Some(size) => size,
-            },
+        let opened = self.restarted.unwrap_or(0.0);
+        if now < opened + self.window {
+            return false;
+        }
+        let base = match self.best_at(now - self.window) {
+            None => return false,
+            Some(size) => size,
         };
         return base.saturating_sub(best) < self.min_gain;
     }
@@ -154,6 +165,8 @@ pub struct Control<'a> {
     generation_cap: Option<u64>,
     generations: u64,
     progress: Progress,
+    /// Set by a population restart, and cleared once a generation has run on the restarted population.
+    restart_unrun: bool,
 }
 
 impl<'a> Control<'a> {
@@ -172,6 +185,7 @@ impl<'a> Control<'a> {
             generation_cap: generation_cap,
             generations: 0,
             progress: Progress::new(window, min_gain),
+            restart_unrun: false,
         };
     }
 
@@ -201,14 +215,22 @@ impl<'a> Control<'a> {
         self.progress.record(now, size);
     }
 
-    /// Reset the stagnation window after a population restart, without erasing improvement history.
+    /// Open a new stagnation window at the current time, after a population restart whose best size
+    /// is `best`. The improvement history is kept, and the restart's best joins it if it improved.
+    /// The restarted population must then run a generation before the stagnation rule can stop the
+    /// search (see [`Control::stagnant`]).
     pub fn reset_stagnation(&mut self, best: u64) {
-        self.progress.epoch = Some((self.now(), best));
+        let now = self.now();
+        self.progress.restart(now, best);
+        self.restart_unrun = true;
     }
 
-    /// Whether the stagnation rule stops the search now, with `best` as its best size.
+    /// Whether the stagnation rule stops the search now, with `best` as its best size. It does not
+    /// while a restarted population has yet to run a generation, whatever the clock says: a window
+    /// that expires between two reads of the clock still gives the restart its generation. The
+    /// deadline and the generation cap are checked separately, and are not deferred by this.
     pub fn stagnant(&self, best: u64) -> bool {
-        return self.progress.should_stop(self.now(), best);
+        return !self.restart_unrun && self.progress.should_stop(self.now(), best);
     }
 
     /// Whether the generation cap has been reached.
@@ -218,9 +240,11 @@ impl<'a> Control<'a> {
             .map_or(false, |cap| self.generations >= cap);
     }
 
-    /// Count one more generation.
+    /// Count one more generation. It is the first generation after a restart that lets the stagnation
+    /// rule apply to the restarted population again.
     pub fn begin_generation(&mut self) {
         self.generations += 1;
+        self.restart_unrun = false;
     }
 
     /// Generations begun so far.
@@ -347,5 +371,97 @@ mod tests {
         clock.0.set(1.9);
         control.record(850);
         assert_eq!(control.history(), &[(0.7, 900), (1.9, 850)]);
+    }
+
+    #[test]
+    fn a_restart_is_not_stagnant_until_a_full_window_has_elapsed_since_it() {
+        let clock = Manual(Cell::new(0.0));
+        let mut control = Control::new(&clock, 1000.0, 10.0, 1, None);
+        control.record(500);
+        clock.0.set(50.0);
+        control.reset_stagnation(500);
+        control.begin_generation();
+        assert!(!control.stagnant(500), "checked at the restart itself");
+        clock.0.set(55.0);
+        assert!(
+            !control.stagnant(500),
+            "checked half a window after the restart, when the stale window [45, 55] had no gain"
+        );
+        clock.0.set(59.9);
+        assert!(!control.stagnant(500), "checked just before the window expires");
+        clock.0.set(60.0);
+        assert!(control.stagnant(500), "a full window with no gain since the restart");
+    }
+
+    #[test]
+    fn each_restart_opens_its_own_window() {
+        let clock = Manual(Cell::new(0.0));
+        let mut control = Control::new(&clock, 1000.0, 10.0, 1, None);
+        control.record(500);
+        clock.0.set(50.0);
+        control.reset_stagnation(500);
+        control.begin_generation();
+        clock.0.set(70.0);
+        control.reset_stagnation(500);
+        control.begin_generation();
+        clock.0.set(79.9);
+        assert!(!control.stagnant(500), "the second restart's window is still open");
+        clock.0.set(80.0);
+        assert!(control.stagnant(500));
+    }
+
+    #[test]
+    fn a_window_after_a_restart_slides_with_the_gains_made_after_it() {
+        let clock = Manual(Cell::new(0.0));
+        let mut control = Control::new(&clock, 1000.0, 10.0, 1, None);
+        control.record(500);
+        clock.0.set(50.0);
+        control.reset_stagnation(500);
+        control.begin_generation();
+        clock.0.set(63.0);
+        control.record(490);
+        clock.0.set(70.0);
+        assert!(
+            !control.stagnant(490),
+            "[60, 70] holds the gain of 10 bytes made at 63"
+        );
+        clock.0.set(73.0);
+        assert!(
+            control.stagnant(490),
+            "[63, 73] holds no gain, so the window slid past the improvement"
+        );
+    }
+
+    #[test]
+    fn a_restarted_population_must_run_a_generation_before_it_can_be_stagnant() {
+        let clock = Manual(Cell::new(0.0));
+        let mut control = Control::new(&clock, 1000.0, 10.0, 1, None);
+        control.record(500);
+        clock.0.set(50.0);
+        control.reset_stagnation(500);
+        clock.0.set(60.0);
+        assert!(
+            !control.stagnant(500),
+            "a full window has elapsed since the restart, but no generation has run on it"
+        );
+        control.begin_generation();
+        assert!(control.stagnant(500), "a generation has run and the window has elapsed");
+    }
+
+    #[test]
+    fn a_restart_keeps_the_improvement_history_and_records_its_own_best() {
+        let clock = Manual(Cell::new(0.0));
+        let mut control = Control::new(&clock, 1000.0, 10.0, 1, None);
+        control.record(500);
+        clock.0.set(50.0);
+        control.reset_stagnation(480);
+        assert_eq!(control.history(), &[(0.0, 500), (50.0, 480)]);
+        clock.0.set(60.0);
+        control.reset_stagnation(480);
+        assert_eq!(
+            control.history(),
+            &[(0.0, 500), (50.0, 480)],
+            "a restart without an improvement adds nothing to the history"
+        );
     }
 }

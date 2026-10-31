@@ -19,6 +19,10 @@ uint R;
 // several proposals and joined by compaction.
 uint budget;
 
+// Source-table probes the proposal being made may still make, hit or miss. A guided search of a cell
+// that matches nothing costs its probes but compares no bytes, so the bytes budget alone would not bound it.
+uint lookups;
+
 uint below(uint n) {
     return rng_below(R, n);
 }
@@ -187,10 +191,11 @@ bool guided_source(bool tgt, uint pos, uint room, out uint src, out uint len) {
     uint best_n = 0u;
     uint best_s = 0u;
     uint tried = 0u;
-    for (uint t = 0u; t < stride && t < room && pos + t + uint(PROBE) <= nl && tried < uint(CANDIDATES); t++) {
+    for (uint t = 0u; t < stride && t < room && pos + t + uint(PROBE) <= nl && tried < uint(CANDIDATES) && lookups > 0u; t++) {
         if (t > 0u) {
             h = (h - new_byte(pos + t - 1u) * pw) * uint(HASH_BASE) + new_byte(pos + t + uint(PROBE) - 1u);
         }
+        lookups--;
         uint lo = tab_lower(base, cap, h);
         if (lo >= cap || tab_hash(base, lo) != h) {
             continue;
@@ -348,6 +353,7 @@ bool mv_guided(uint par, uint chd, bool tgt) {
         return false;
     }
     budget = uint(MAX_COMPARE);
+    lookups = uint(MAX_LOOKUPS);
     uint pos;
     if (!sample_changed(pos)) {
         return false;
@@ -1072,13 +1078,40 @@ void make_compact(uint chd) {
     w_end();
 }
 
-// A greedy seed: make one guided old-image copy proposal per changed cell. Evaluation repairs
-// uncovered bytes, so the seed stays bounded while still using the source table's long matches.
+// A greedy seed: one piece per changed cell, a guided old-image copy where the source table has one,
+// and otherwise the cell's new bytes, zero or raw. Adjacent pieces of one kind that continue each
+// other join into one operation, so a run of changed cells of one kind costs one. The seed compares
+// within one proposal's budget and probes within MAX_LOOKUPS, so its work is bounded whatever the image
+// holds. A seed that covers every changed cell needs no repair, so it may use the whole of the profile's
+// operations and extents. A seed that leaves changed bytes to the repair keeps one operation and one
+// extent back for it; the evaluation refuses the seed if the repair cannot fit. Only a seed that stops
+// early leaves bytes to the repair, because its next piece does not fit. A copy shorter than its cell
+// leaves the rest of the cell unwritten, so it is kept only where that rest is already right: where the
+// old image, which the target starts as, holds the same bytes. The check draws on the comparison budget
+// and ends at the end of the old image, so a rest that cannot be verified is taken as wrong, and the
+// cell is written whole, raw or zero. The repair of a wrong rest could be any number of extents, which
+// the seed cannot predict. A copy is never chosen where the profile cannot admit its two extents in
+// one operation.
 void make_greedy(uint chd) {
     w_begin(chd);
     uint nl = P(P_NEW_LEN);
     uint cells = P(P_NCELLS);
     uint classes = P(P_CLASSES);
+    budget = uint(MAX_COMPARE);
+    lookups = uint(MAX_LOOKUPS);
+    uint op_room = min(P(P_MAX_OPS), uint(OP_CAP));
+    uint ext_room = min(P(P_MAX_EXT_TOTAL), uint(EXT_CAP));
+    bool copies = P(P_MAX_EXT_OP) >= 2u;
+    // The pieces in order, and the extents they use. They are written once the seed is decided, so that
+    // a seed that leaves work to the repair can give up its last pieces to it.
+    uint piece_kind[OP_CAP];
+    uint piece_dst[OP_CAP];
+    uint piece_len[OP_CAP];
+    uint piece_src[OP_CAP];
+    uint np = 0u;
+    uint ext = 0u;
+    uint searched = 0u;
+    bool repair = false;
     for (uint g = 0u; g < cells; g++) {
         uint cls = ix[classes + g];
         if ((cls & uint(CELL_EQUAL)) != 0u) {
@@ -1086,16 +1119,62 @@ void make_greedy(uint chd) {
         }
         uint pos = g * uint(GRID);
         uint end = min(pos + uint(GRID), nl);
-        uint src;
-        uint len;
-        if (guided_source(false, pos, end - pos, src, len)) {
-            w_simple(uint(K_SOURCE), pos, len, src);
-        } else if ((cls & uint(CELL_ZERO)) != 0u) {
-            w_simple(uint(K_ZERO), pos, end - pos, 0u);
-        } else {
-            w_simple(uint(K_REPLACE), pos, end - pos, 0u);
+        uint raw = (cls & uint(CELL_ZERO)) != 0u ? uint(K_ZERO) : uint(K_REPLACE);
+        uint src = 0u;
+        uint copy_len = 0u;
+        bool copy = false;
+        // The matcher is entered only while it has budget and lookups left, so a cell past either is written
+        // without a probe.
+        if (copies && budget > 0u && lookups > 0u) {
+            searched++;
+            copy = guided_source(false, pos, end - pos, src, copy_len);
+            if (copy && copy_len < end - pos) {
+                // The rest of the cell is left unwritten, so it must already be right. The comparison stops
+                // at the end of the old image and at the budget, and anything short of the whole rest fails.
+                uint rest = end - pos - copy_len;
+                copy = match_len(false, pos + copy_len, pos + copy_len, rest) == rest;
+            }
+        }
+        uint kind = copy ? uint(K_SOURCE) : raw;
+        uint len = copy ? copy_len : end - pos;
+        uint need = kind == uint(K_SOURCE) ? 2u : 1u;
+        bool joins = np > 0u && piece_kind[np - 1u] == kind && piece_dst[np - 1u] + piece_len[np - 1u] == pos
+            && (kind != uint(K_SOURCE) || piece_src[np - 1u] + piece_len[np - 1u] == src);
+        if (copy && (np + (joins ? 0u : 1u) > op_room || ext + (joins ? 0u : need) > ext_room)) {
+            // A copy that does not fit gives way to the cell's own bytes, which are whole and may still join.
+            copy = false;
+            kind = raw;
+            len = end - pos;
+            src = 0u;
+            need = 1u;
+            joins = np > 0u && piece_kind[np - 1u] == kind && piece_dst[np - 1u] + piece_len[np - 1u] == pos;
+        }
+        if (joins) {
+            piece_len[np - 1u] += len;
+            continue;
+        }
+        if (np + 1u > op_room || ext + need > ext_room) {
+            repair = true;
+            break;
+        }
+        piece_kind[np] = kind;
+        piece_dst[np] = pos;
+        piece_len[np] = len;
+        piece_src[np] = src;
+        np++;
+        ext += need;
+    }
+    if (repair) {
+        // The repair needs one operation and one extent after the pieces, so the last pieces give way.
+        while (np > 0u && (np + 1u > op_room || ext + 1u > ext_room)) {
+            np--;
+            ext -= piece_kind[np] == uint(K_SOURCE) ? 2u : 1u;
         }
     }
+    for (uint p = 0u; p < np; p++) {
+        w_simple(piece_kind[p], piece_dst[p], piece_len[p], piece_src[p]);
+    }
+    st[chd + H_SEARCHED] = searched;
     w_end();
 }
 
