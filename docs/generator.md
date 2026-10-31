@@ -365,7 +365,7 @@ sequenceDiagram
     H->>D: prepare: sort copy-source tables, classify cells, seed, evaluate, select
     loop one batch = several generations in one submission
         H->>D: breed, replay, count, prefix, emit, finish, select (barrier between each)
-        D-->>H: 256 bytes of counters (after the fence)
+        D-->>H: 512 bytes of counters (after the fence)
         H->>H: deadline, stagnation, generation cap
     end
     H->>D: read back the archive (the finalist programs), once
@@ -394,11 +394,10 @@ the compiler select a buffer descriptor per invocation, and Mesa's software devi
 for some inputs. One buffer and a selected offset has no such selection (§6.7).
 
 **Upload once, read back once.** The images go up once, in pieces that fit the staging buffer.
-During the search the host reads back only the control words (about 256 bytes per batch). The
+During the search the host reads back only the control words (512 bytes per batch). The
 archive is read when the search ends. `SessionStats` reports the bytes moved each way and the
 device memory held, so the claim is measured: a 60-generation search of two 64 KiB images moves 128
-KiB up and under 1 MB back, and a longer search moves the same up and 300 bytes more per generation
-back (§11).
+KiB up and under 1 MB back; per-generation readback grows with the control block size and batching (§11).
 
 ### 6.2 One layout, two languages
 
@@ -585,7 +584,8 @@ flowchart LR
 ```
 
 A child is written into a free slot. Selection sorts the elites and the admitted children by raw size,
-then fingerprint, drops duplicates, and keeps 24; every other slot becomes free. A move writes a
+then structural fingerprint for ordering, and drops duplicates by the fingerprint of raw-written bytes
+(`DFP`), matching the archive's equivalence rule. It keeps 24; every other slot becomes free. A move writes a
 child by **reading a parent and appending to the child front to back** through a writer, never by
 shifting data in place, so a child is always packed: its operations in order, and each operation's
 extents contiguous. The writer checks every capacity before it writes; when one runs out it sets a flag
@@ -601,10 +601,13 @@ The seeding generation evaluates `NCAND` candidates:
 | 0 | the raw replacement of the whole new image: one `REPLACE` |
 | 1 | the **compact** program: one operation per run of changed cells, `ZERO` where the new bytes are zero |
 | 2 | the **empty** program, which the repair turns into exactly the changed bytes |
-| 3.. | random immigrants |
+| 3 | a greedy seed: one guided old-image copy proposal per changed cell, with raw/zero fallback |
+| 4.. | random immigrants |
 
-The earlier search had a sparse seed and a compressed compact seed; those are encodings, and the
-encoding pass makes them from the raw programs (§9.1). The raw replacement is always the first
+The greedy seed reuses the guided source-table matcher. Its bounded cell proposals are repaired by
+the ordinary evaluation path, so every candidate still receives the same admission and correctness
+checks. The earlier search had a sparse seed and a compressed compact seed; those are encodings, and
+the encoding pass makes them from the raw programs (§9.1). The raw replacement is always the first
 candidate, so a valid program exists the moment the first generation is evaluated, subject to the
 profile admitting it.
 
@@ -688,12 +691,10 @@ disjoint from the destination.
 ### 7.6 Randomness and determinism
 
 Each child draws from its own stream: a PCG generator seeded by a hash of the seed, the generation
-and the child's index. Nothing a thread does depends on another thread or on scheduling: parents are
-read only, a child writes only its own slot, counters are commutative atomics, the tables are sorted
-by a total order, and selection breaks ties by fingerprint. A run with a generation cap is therefore
-reproducible from its seed alone, **independently of how it is split into batches, and of the
-device**: the software device and the hardware device return identical finalists and counters
-(`the_software_and_the_hardware_device_run_the_same_search`).
+and the child's index. Within a device, a generation-capped run is reproducible independently of its
+batching. Results are not required to match across devices: guided seed and move proposals may select
+different valid sources. The software and hardware tests therefore validate finalists independently
+against the CPU evaluator rather than comparing their search trajectories.
 
 ### 7.7 Evaluation
 
@@ -758,7 +759,11 @@ that is bounded:
 | sum of lengths in a program | `SUM_LIMIT` = 2^31 - 1 | refused: `length overflow` |
 
 The refusals are counted by reason in the control words, and `Found::counters` reports them, so a run
-that is starved by a capacity says so instead of silently searching a smaller space.
+that is starved by a capacity says so instead of silently searching a smaller space. Selection also
+keeps saturating per-mutation counts of proposals, skipped attempts, evaluation admissions and strict
+new global bests. A generation credits at most one mutation for a new best. These are diagnostics,
+not adaptive weights; seeds, immigrants and crossovers are excluded. The counters reset on prepare,
+load or diagnostic evaluation, and survive archive restart.
 
 ## 8. Control, deadlines and progress
 
@@ -810,19 +815,26 @@ progress = best(now − window) − best(now)
 stop if now ≥ window and progress < min_improvement_bytes
 ```
 
-### 8.4 Why stagnation now measures raw size
+### 8.4 Plateau restarts
 
-The final payload is chosen after the search, so its size is not known during it. A search that
-stopped on compressed progress would need a CPU encoding inside the loop, which is the architecture
-this revision removes. Raw progress is a faithful proxy while a program is changing what it writes,
-and it flattens when the search has run out of ideas, which is the signal the rule is for.
+Stagnation is measured on the best raw size using the full rolling window in §8.3. On a stagnant
+window, the session restarts its population from the archived finalists plus deterministic immigrants.
+Immigrants use the next global generation number, so repeated restarts do not repeat the same random
+proposals. The archive survives as the elite seed, and the generation count continues across restarts.
+The progress window is reset at each restart without erasing the reported improvement history. Any
+new best raw size resets the consecutive-restart count. The search stops with `Stop::Stagnation` only
+after three consecutive restarts have failed to produce an improvement; the deadline and generation
+cap remain independent upper bounds.
+
+Raw size is used because the final compressed payload is chosen after the search. Measuring compressed
+progress inside the loop would require CPU encoding on every candidate, which the GPU search avoids.
 
 ### 8.5 Settings and disabled criteria
 
 | Setting | Default | Accepted values | Meaning |
 | --- | --- | --- | --- |
 | `max_search_seconds` | 30 | finite, zero or more | the longest elapsed time of the **GPU search**; zero is seed-only (§8.2). Infinity is refused: use `max_generations` for a bound that does not depend on the clock. The CPU's encoding pass and the final signing are extra |
-| `stagnation_seconds` | 5 | finite, above zero | the length of the window in which progress is measured |
+| `stagnation_seconds` | 5 | finite, above zero | the length of the window in which progress is measured before a population restart |
 | `min_improvement_bytes` | 1 | any | the smallest raw gain within a full window. **Zero disables the stagnation rule** |
 | `max_generations` | none | any | stop after this many generations. **`None` disables the cap**. Zero runs the seeding generation and no more |
 | `seed` | 1 | any | the seed of every random choice |
@@ -1035,9 +1047,10 @@ extent by extent, and on every byte of its size.
 **The search** (`tests/gpu_search.rs`):
 
 - every finalist replays to the new image on the CPU and costs exactly what the device scored;
-- a seed and a generation cap reproduce the same finalists and counters; **batching does not change
-  the result** (one batch of twelve, twelve of one, five, sixty-four, and time-sized batches agree
-  exactly); the software and the hardware device agree;
+- a seed and generation cap reproduce the same finalists and counters on a device; **batching does
+  not change the result** (one batch of twelve, twelve of one, five, sixty-four, and time-sized batches
+  agree exactly); software and hardware finalists are each validated against the CPU evaluator, but
+  need not match one another;
 - each operator is bred alone from a known parent with one move forced, and checked: proposals are
   well formed, every copy copies exactly what it claims, and each move does what it is for. A guided copy
   is found at an odd source offset; a copy through a hash collision is never made (the test fails if
@@ -1358,16 +1371,20 @@ hardware for the first of those reasons, which is why the suite now runs on both
 
 ## 16. Tuning and benchmarking
 
-The constants of the search are in `shaders/layout.glsl`, and `build.rs` turns them into the host's
-constants, so changing one changes both. Changing one rebuilds the shaders; the software device then
-recompiles a stage the first time it runs.
+The structural constants of the search are in `shaders/layout.glsl`, and `build.rs` turns them into
+the host's constants, so changing one changes both. Structural changes rebuild the shaders; the software
+device then recompiles a stage the first time it runs. The GA schedule parameters (`TOURNAMENT`,
+`IMMIGRANT_PERCENT`, `CROSSOVER_PERCENT` and `ELITES`) are instead written into the parameter buffer
+when a session opens, so they can be varied without rebuilding a shader. `SessionConfig` defaults them
+to the values below.
 
 | Constant | Value | Notes |
 | --- | --- | --- |
-| `POP`, `ELITES`, `CHILDREN`, `NCAND` | 24, 3, 96, 96 | `NCAND` is the larger of `CHILDREN` and `POP`. More children cost memory (every candidate has three run arrays and two scratch slots) and gave a few percent more at 192 on the 16 MiB pair |
+| `POP`, default `ELITES`, `CHILDREN`, `NCAND` | 24, 3, 96, 96 | `ELITES` is a per-session parameter; its default is 3. `NCAND` is the larger of `CHILDREN` and `POP`. More children cost memory (every candidate has three run arrays and two scratch slots) and gave a few percent more at 192 on the 16 MiB pair |
 | `OP_CAP`, `EXT_CAP`, `RUN_CAP` | 512, 16,384, 16,384 | the workspace; memory is `NCAND · 3 · RUN_CAP · 16` bytes of runs, and `(POOL + ARCHIVE + 2 · NCAND) · SLOT_WORDS · 4` of slots. The runs buffer must fit the device's storage buffer range: 128 MiB on the software device |
 | `REPLAY_BUDGET`, `SORT_MAX`, `MAX_COMPARE` | 2^20, 8,192, 256 KiB | the bounds of §7.9 |
 | `COMPACT_COMPARES` | 4,096 | extent pairs the compaction move compares per child (§7.4) |
+| default `TOURNAMENT`, `IMMIGRANT_PERCENT`, `CROSSOVER_PERCENT` | 3, 8%, 12% | per-session parameters in `SessionConfig`; percentages are evaluated on each non-elite child |
 | move weights, percentages | as in §7.4 | in `moves.glsl` (`move_weight`) and `layout.glsl` |
 | `compress::WORK_BUDGET`, `CHUNK_COST`, `FREE_CANDIDATES`, `REFINED_OPS` | 2^28, 512, 2, 64 | the encoding pass's bounds (§9.3). Raising the work budget fourfold bought nothing on the 16 MiB pair at 20 s (379,861 B against 379,799 B) and cost five more seconds |
 | `compress::ANALYSIS_BYTES` | 8 MiB | the bytes one candidate's analysis may retain (§18.6); beyond it the candidate is evaluated by replay |

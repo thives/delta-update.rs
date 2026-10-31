@@ -31,6 +31,10 @@ use crate::gpu::SessionConfig;
 use crate::gpu::SessionStats;
 use crate::gpu::SizeModel;
 use crate::gpu_layout::Counters;
+use crate::gpu_layout::DEFAULT_CROSSOVER_PERCENT;
+use crate::gpu_layout::DEFAULT_ELITES;
+use crate::gpu_layout::DEFAULT_IMMIGRANT_PERCENT;
+use crate::gpu_layout::DEFAULT_TOURNAMENT;
 use crate::gpu_layout::FITNESS_INVALID;
 use crate::memory::bytes_equal;
 
@@ -178,6 +182,10 @@ pub fn session_config(
         max_extents_per_op: word(problem.profile.max_extents_per_op),
         max_total_extents: word(problem.profile.max_total_extents),
         model: model,
+        tournament: DEFAULT_TOURNAMENT as u32,
+        immigrant_percent: DEFAULT_IMMIGRANT_PERCENT as u32,
+        crossover_percent: DEFAULT_CROSSOVER_PERCENT as u32,
+        elites: DEFAULT_ELITES as u32,
     });
 }
 
@@ -198,6 +206,7 @@ pub fn open_session(problem: &Problem, config: &SearchConfig) -> Result<Session,
 
 const BATCH_TARGET: Duration = Duration::from_millis(60);
 const BATCH_MAX: u32 = 64;
+const MAX_STAGNATION_RESTARTS: u32 = 3;
 
 /// What the device search returns: the finalist programs, why it stopped, and what it cost.
 #[derive(Clone, Debug)]
@@ -292,6 +301,7 @@ pub fn run_with(
     };
     record(&mut ctl, &counters);
     let mut per_generation = Duration::ZERO;
+    let mut stagnation_restarts = 0u32;
     let stop = loop {
         if ctl.generation_cap_reached() {
             break Stop::Generations;
@@ -300,7 +310,23 @@ pub fn run_with(
             break Stop::Deadline;
         }
         if counters.best != FITNESS_INVALID && ctl.stagnant(counters.best as u64) {
-            break Stop::Stagnation;
+            if stagnation_restarts >= MAX_STAGNATION_RESTARTS {
+                break Stop::Stagnation;
+            }
+            let previous_best = counters.best;
+            counters = match session.restart_from_archive() {
+                Err(e) => return Err(e),
+                Ok(c) => c,
+            };
+            if counters.best < previous_best {
+                stagnation_restarts = 0;
+            } else {
+                stagnation_restarts += 1;
+            }
+            ctl.reset_stagnation(counters.best as u64);
+            per_generation = Duration::ZERO;
+            record(&mut ctl, &counters);
+            continue;
         }
         let mut n = match batch {
             Some(n) => std::cmp::max(n, 1),
@@ -311,6 +337,7 @@ pub fn run_with(
         if let Some(cap) = config.max_generations {
             n = std::cmp::min(n as u64, cap - ctl.generations()) as u32;
         }
+        let previous_best = counters.best;
         let started = Instant::now();
         counters = match session.run_generations(n) {
             Err(e) => return Err(e),
@@ -324,6 +351,9 @@ pub fn run_with(
         };
         for _ in 0..n {
             ctl.begin_generation();
+        }
+        if counters.best < previous_best {
+            stagnation_restarts = 0;
         }
         record(&mut ctl, &counters);
     };

@@ -1072,6 +1072,33 @@ void make_compact(uint chd) {
     w_end();
 }
 
+// A greedy seed: make one guided old-image copy proposal per changed cell. Evaluation repairs
+// uncovered bytes, so the seed stays bounded while still using the source table's long matches.
+void make_greedy(uint chd) {
+    w_begin(chd);
+    uint nl = P(P_NEW_LEN);
+    uint cells = P(P_NCELLS);
+    uint classes = P(P_CLASSES);
+    for (uint g = 0u; g < cells; g++) {
+        uint cls = ix[classes + g];
+        if ((cls & uint(CELL_EQUAL)) != 0u) {
+            continue;
+        }
+        uint pos = g * uint(GRID);
+        uint end = min(pos + uint(GRID), nl);
+        uint src;
+        uint len;
+        if (guided_source(false, pos, end - pos, src, len)) {
+            w_simple(uint(K_SOURCE), pos, len, src);
+        } else if ((cls & uint(CELL_ZERO)) != 0u) {
+            w_simple(uint(K_ZERO), pos, end - pos, 0u);
+        } else {
+            w_simple(uint(K_REPLACE), pos, end - pos, 0u);
+        }
+    }
+    w_end();
+}
+
 // A random program: the image cut into a few random pieces, each written by a random operation.
 // A copy piece takes a random source of its own length, from the old image or from the target.
 // The evaluation repairs what is wrong.

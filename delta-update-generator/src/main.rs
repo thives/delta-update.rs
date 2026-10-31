@@ -94,7 +94,7 @@ fn stop_text(stop: Stop) -> &'static str {
     return match stop {
         Stop::Unchanged => "the images are equal",
         Stop::Deadline => "the time limit",
-        Stop::Stagnation => "no progress within the stagnation window",
+        Stop::Stagnation => "no improvement after three population restarts",
         Stop::Generations => "the generation limit",
     };
 }

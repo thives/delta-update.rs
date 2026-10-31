@@ -124,7 +124,13 @@ pub fn encode_program(program: &[Op]) -> Result<SlotImage, EncodeError> {
         for s in &op.src {
             put_extent(&mut exts, s)?;
         }
-        ops.extend_from_slice(&[kind, dst_first, op.dst.len() as u32, src_first, op.src.len() as u32]);
+        ops.extend_from_slice(&[
+            kind,
+            dst_first,
+            op.dst.len() as u32,
+            src_first,
+            op.src.len() as u32,
+        ]);
     }
     let mut header = vec![0u32; SLOT_HDR];
     header[H_NOPS] = program.len() as u32;
@@ -152,7 +158,11 @@ fn put_extent(exts: &mut Vec<u32>, span: &Span) -> Result<(), EncodeError> {
 pub fn decode_program(image: &SlotImage) -> Option<Vec<Op>> {
     let nops = image.header[H_NOPS] as usize;
     let next = image.header[H_NEXT] as usize;
-    if nops > OP_CAP || next > EXT_CAP || image.ops.len() < nops * OPW || image.exts.len() < next * 2 {
+    if nops > OP_CAP
+        || next > EXT_CAP
+        || image.ops.len() < nops * OPW
+        || image.exts.len() < next * 2
+    {
         return None;
     }
     let span = |index: usize| Span {
@@ -178,6 +188,19 @@ pub fn decode_program(image: &SlotImage) -> Option<Vec<Op>> {
     return Some(out);
 }
 
+/// Cumulative, saturating counts for one mutation ID. Updated only when selection runs.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MoveCounters {
+    /// Children for which this mutation was attempted, including skipped and refused children.
+    pub proposed: u32,
+    /// Attempts with no valid form, marked `S_SKIP` by breeding.
+    pub skipped: u32,
+    /// Attempts accepted by evaluation, whether or not selected into the population.
+    pub admitted: u32,
+    /// Generations where this mutation produced the selected, strictly improved global best.
+    pub new_best: u32,
+}
+
 /// The control words the shaders keep, read back between batches.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Counters {
@@ -197,6 +220,9 @@ pub struct Counters {
     pub skipped: u32,
     /// Candidates refused, by status code.
     pub refused: [u32; S_COUNT],
+    /// Mutation counters indexed by the zero-based `MV_*` ID. Seeds, immigrants and crossovers
+    /// are excluded. Counters saturate at `u32::MAX` and are reset by `prepare` or `load_population`.
+    pub moves: [MoveCounters; MV_COUNT],
 }
 
 impl Counters {
@@ -206,7 +232,17 @@ impl Counters {
         for (k, slot) in refused.iter_mut().enumerate() {
             *slot = words[C_REJ + k];
         }
+        let moves = std::array::from_fn(|id| {
+            let at = C_MOVE + id * MOVE_STATS;
+            MoveCounters {
+                proposed: words[at + MS_PROPOSED],
+                skipped: words[at + MS_SKIPPED],
+                admitted: words[at + MS_ADMITTED],
+                new_best: words[at + MS_NEW_BEST],
+            }
+        });
         return Counters {
+            moves: moves,
             generations: words[C_GEN],
             best: words[C_BEST],
             members: words[C_NVALID],
@@ -229,7 +265,10 @@ mod tests {
     use super::*;
 
     fn s(start: u64, len: u64) -> Span {
-        return Span { start: start, len: len };
+        return Span {
+            start: start,
+            len: len,
+        };
     }
 
     #[test]
@@ -263,12 +302,37 @@ mod tests {
     }
 
     #[test]
+    fn move_counters_decode_in_mutation_id_order() {
+        let mut words = vec![0; CTL_WORDS];
+        for id in 0..MV_COUNT {
+            for stat in 0..MOVE_STATS {
+                words[C_MOVE + id * MOVE_STATS + stat] = (id * MOVE_STATS + stat + 1) as u32;
+            }
+        }
+        let counters = Counters::from_words(&words);
+        for id in 0..MV_COUNT {
+            assert_eq!(
+                counters.moves[id],
+                MoveCounters {
+                    proposed: (id * MOVE_STATS + MS_PROPOSED + 1) as u32,
+                    skipped: (id * MOVE_STATS + MS_SKIPPED + 1) as u32,
+                    admitted: (id * MOVE_STATS + MS_ADMITTED + 1) as u32,
+                    new_best: (id * MOVE_STATS + MS_NEW_BEST + 1) as u32,
+                }
+            );
+        }
+    }
+
+    #[test]
     fn the_layout_matches_the_shader_header() {
         assert_eq!(SLOT_WORDS, SLOT_HDR + OP_CAP * OPW + EXT_CAP * 2);
         assert_eq!(STATE_WORDS, ST_SLOTS + SLOTS * SLOT_WORDS);
-        assert!(ELITES <= POP);
+        assert!(DEFAULT_ELITES <= POP);
         assert_eq!(NCAND, std::cmp::max(CHILDREN, POP));
         assert_eq!(POOL, POP + NCAND);
+        assert!(C_REJ + S_COUNT <= C_MOVE);
+        assert!(C_MOVE + MV_COUNT * MOVE_STATS <= CTL_WORDS);
+        assert!(H_MOVE < SLOT_HDR);
         assert!(MAX_IMAGE <= u32::MAX as usize);
     }
 }

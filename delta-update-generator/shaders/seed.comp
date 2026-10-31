@@ -25,7 +25,10 @@ void main() {
     } else if (j == 2u) {
         w_begin(chd);
         w_end();
+    } else if (j == 3u) {
+        make_greedy(chd);
     } else {
         make_immigrant(chd);
     }
+    st[chd + H_MOVE] = 0u;
 }

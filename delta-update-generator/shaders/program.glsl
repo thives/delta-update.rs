@@ -64,6 +64,7 @@ void p_clear(uint sb) {
     st[sb + H_NEXT] = 0u;
     st[sb + H_FIT] = FIT_INVALID;
     st[sb + H_STATUS] = uint(S_SKIP);
+    st[sb + H_MOVE] = 0u;
 }
 
 // Copy the used part of slot `from` over slot `to`, header included.

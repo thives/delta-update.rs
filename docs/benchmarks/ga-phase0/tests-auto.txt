@@ -1,0 +1,1084 @@
+    Finished `release` profile [optimized] target(s) in 0.04s
+     Running unittests src/lib.rs (/tmp/ga-phase0/head-target/release/deps/delta_update_cli-242a28e643c32b25)
+
+running 153 tests
+test filecheckpoint::tests::a_case_folded_directory_refuses_the_record_before_and_after_it_exists ... ok
+test filecheckpoint::tests::a_checkpoint_record_in_the_lock_directory_is_refused ... ok
+test filecheckpoint::tests::a_checkpoint_path_without_a_file_name_or_a_missing_directory_is_refused ... ok
+test filecheckpoint::tests::a_directory_the_owner_can_read_but_not_search_has_its_owner_bits_restored_before_its_marker_is_checked ... ok
+test filecheckpoint::tests::a_checkpoint_name_that_is_not_plain_ascii_is_refused_before_any_lock_is_taken ... ok
+test filecheckpoint::tests::a_failed_look_up_after_an_absent_load_is_uncertain_and_confirms_nothing ... ok
+test filecheckpoint::tests::a_dangling_symbolic_link_is_refused_rather_than_read_as_no_record ... ok
+test filecheckpoint::tests::a_marker_or_directory_of_another_owner_is_refused_and_its_modes_are_left_as_they_are ... ok
+test filecheckpoint::tests::a_marker_no_longer_than_its_contents_is_made_again_but_a_longer_one_is_refused ... ok
+test filecheckpoint::tests::a_failed_look_up_or_removal_of_a_stale_candidate_is_an_error_and_keeps_the_candidates ... ok
+test filecheckpoint::tests::a_checkpoint_lock_is_shared_through_a_symbolic_link_to_the_directory_before_the_record_exists ... ok
+test filecheckpoint::tests::a_file_of_exactly_one_record_is_read_whole ... ok
+test filecheckpoint::tests::a_folding_directory_is_refused_whether_or_not_the_record_exists_and_releases_its_lock ... ok
+test filecheckpoint::tests::a_failed_staging_directory_sync_leaves_the_record_unconfirmed_as_well ... ok
+test filecheckpoint::tests::a_file_of_any_other_size_is_refused_as_invalid ... ok
+test filecheckpoint::tests::a_legacy_temporary_symlink_cannot_redirect_a_write ... ok
+test filecheckpoint::tests::a_failed_directory_sync_after_the_removal_is_uncertain_and_the_record_is_gone ... ok
+test filecheckpoint::tests::a_checkpoint_clear_with_a_working_sync_removes_the_record_and_reports_nothing ... ok
+test filecheckpoint::tests::a_failed_listing_leaves_the_debris_and_the_record_link_is_still_found_by_name ... ok
+test filecheckpoint::tests::a_failed_look_up_while_removing_the_link_is_an_error_and_the_link_is_kept ... ok
+test filecheckpoint::tests::a_refused_marker_in_a_directory_the_owner_cannot_read_restores_its_mode_and_the_refusal_names_read_and_search ... ok
+test filecheckpoint::tests::a_failed_sync_when_no_record_remains_is_uncertain_until_a_later_sync_confirms_the_absence ... ok
+test filecheckpoint::tests::a_leftover_temporary_file_does_not_block_a_replacement ... ok
+test filecheckpoint::tests::a_later_record_whose_directory_sync_failed_is_refused_by_the_confirmation_until_a_sync_works ... ok
+test filecheckpoint::tests::a_later_store_resumes_its_record_past_the_staging_file_of_an_interrupted_replacement ... ok
+test filecheckpoint::tests::a_crash_that_keeps_an_unconfirmed_rename_resumes_the_new_record_once_it_is_confirmed ... ok
+test filecheckpoint::tests::a_crash_that_loses_an_unconfirmed_rename_leaves_the_previous_record_which_confirms_and_resumes ... ok
+test filecheckpoint::tests::a_link_that_cannot_be_removed_refuses_the_open_and_the_next_open_removes_it ... ok
+test filecheckpoint::tests::a_missing_record_is_no_record ... ok
+test filecheckpoint::tests::a_probe_that_cannot_run_refuses_the_store_and_releases_its_lock ... ok
+test filecheckpoint::tests::a_named_pipe_is_refused_without_waiting_for_a_writer ... ok
+test filecheckpoint::tests::a_marker_that_an_interrupted_umask_left_unreadable_is_restored_and_completed ... ok
+test filecheckpoint::tests::a_record_named_as_a_case_probe_is_refused_and_a_probe_in_flight_is_left_alone ... ok
+test filecheckpoint::tests::a_new_record_has_no_group_or_other_permissions ... ok
+test filecheckpoint::tests::an_initialization_directory_the_owner_can_read_is_refused_with_its_mode_and_entries_kept ... ok
+test filecheckpoint::tests::an_initialization_directory_that_is_not_its_own_shape_is_refused_and_untouched ... ok
+test filecheckpoint::tests::an_initialization_directory_the_owner_cannot_read_has_its_owner_bits_restored_before_the_refusal ... ok
+test filecheckpoint::tests::an_initialization_directory_the_owner_can_search_keeps_its_mode_when_its_sole_marker_is_refused ... ok
+test filecheckpoint::tests::a_removal_that_fails_before_the_unlink_is_a_storage_error_and_keeps_the_entry ... ok
+test filecheckpoint::tests::a_torn_marker_in_an_initialization_directory_the_owner_can_search_is_still_repaired ... ok
+test filecheckpoint::tests::a_record_with_a_second_name_is_refused_before_it_is_read ... ok
+test filecheckpoint::tests::a_published_staging_directory_wins_and_a_leftover_initialization_directory_beside_it_is_left_alone ... ok
+test filecheckpoint::tests::an_initialization_directory_the_owner_cannot_search_is_moved_aside_whole_and_the_next_open_starts_afresh ... ok
+test filecheckpoint::tests::a_renamed_record_whose_directory_sync_failed_is_visible_but_refused_until_a_confirmation_succeeds ... ok
+test filecheckpoint::tests::a_record_named_as_a_staging_file_is_refused_before_the_lock_and_no_staging_file_is_taken_over ... ok
+test filecheckpoint::tests::a_removal_that_is_not_confirmed_durable_refuses_every_open_until_a_sync_confirms_it ... ok
+test filecheckpoint::tests::a_role_reaching_the_record_through_a_second_name_meets_the_records_own_inode_lock ... ok
+test filecheckpoint::tests::a_record_named_like_a_lock_file_contends_for_the_directory_lock_and_writes_nothing_while_it_is_held ... ok
+test filecheckpoint::tests::a_stale_staging_form_entry_the_sweep_may_not_remove_is_skipped_and_the_replacement_proceeds ... ok
+test filecheckpoint::tests::only_the_form_this_store_makes_is_a_staging_name ... ok
+test filecheckpoint::tests::a_second_link_under_another_records_name_is_left_alone_and_the_record_stays_refused ... ok
+test filecheckpoint::tests::a_second_link_to_the_record_left_by_an_unfinished_publication_is_removed_on_open ... ok
+test filecheckpoint::tests::a_symbolic_link_to_a_record_is_refused_and_its_target_is_untouched ... ok
+test filecheckpoint::tests::checkpoint_records_cannot_live_inside_the_internal_staging_directory_even_through_an_alias ... ok
+test filecheckpoint::tests::a_stored_record_loads_back_and_a_replacement_supersedes_it ... ok
+test filecheckpoint::tests::a_store_refuses_a_record_that_is_another_runs_held_file_and_releases_its_locks ... ok
+test filecheckpoint::tests::a_parent_symlink_retargeted_after_the_lock_leaves_the_run_on_its_own_directory ... ok
+test filecheckpoint::tests::confirm_absent_refuses_a_dangling_link_at_the_record_name_and_removes_nothing ... ok
+test filecheckpoint::tests::cleanup_is_bounded_and_can_continue_on_later_opens ... ok
+test filecheckpoint::tests::confirm_absent_refuses_a_stored_record_and_removes_nothing ... ok
+test filecheckpoint::tests::every_open_syncs_the_staging_directory_even_when_no_second_link_is_found ... ok
+test filecheckpoint::tests::entries_of_another_form_that_take_every_name_are_not_removed_and_the_replacement_fails_keeping_the_record ... ok
+test filedevice::tests::a_device_is_identified_without_a_lock_and_a_second_handle_to_it_is_held_by_the_first ... ok
+test filedevice::tests::a_device_that_is_neither_a_regular_file_nor_a_block_device_is_refused_before_any_lock ... ok
+test filecheckpoint::tests::case_variants_on_a_case_sensitive_directory_are_separate_records_that_one_lock_serialises ... ok
+test filecheckpoint::tests::remove_stale_candidates_removes_only_single_link_files_at_its_own_names ... ok
+test filecheckpoint::tests::debris_of_an_earlier_replacement_is_removed_when_the_next_store_opens_the_directory ... ok
+test filedevice::tests::a_write_past_the_end_is_rejected_without_growing_the_file ... ok
+test filedevice::tests::capacity_is_the_file_size_whatever_its_length ... ok
+test filedevice::tests::flush_propagates_sync_failure ... ok
+test filedevice::tests::flush_syncs_the_file_after_writes ... ok
+test filecheckpoint::tests::legacy_staging_names_in_the_record_directory_are_never_swept ... ok
+test filecheckpoint::tests::failure_before_publication_preserves_old_record_and_removes_staging_file ... ok
+test filedevice::tests::unaligned_writes_land_at_their_byte_offsets_and_nowhere_else ... ok
+test filelock::tests::a_lock_directory_is_usable_only_when_no_one_but_its_owner_can_reach_it ... ok
+test filelock::tests::a_dangling_symbolic_link_at_the_lock_name_is_refused_and_creates_nothing ... ok
+test filelock::tests::a_lock_directory_that_is_missing_a_file_or_a_symbolic_link_is_refused ... ok
+test filelock::tests::a_lock_file_that_an_access_acl_grants_a_named_group_is_refused ... ok
+test filelock::tests::a_lock_file_an_interrupted_release_left_without_owner_access_is_refused_and_is_not_changed ... ok
+test filelock::tests::a_lock_name_must_be_one_plain_file_name_and_every_other_form_is_refused_before_any_open ... ok
+test filelock::tests::a_lock_file_with_a_second_name_is_refused ... ok
+test filelock::tests::a_named_pipe_at_the_lock_name_is_refused_without_waiting ... ok
+test filecheckpoint::tests::staging_inode_is_locked_before_rename_and_remains_locked_after_publication ... ok
+test filelock::tests::a_pre_existing_lock_file_accessible_to_others_is_refused_and_its_mode_is_left_alone ... ok
+test filelock::tests::a_rejected_name_neither_opens_nor_changes_a_file_outside_the_namespace ... ok
+test filecheckpoint::tests::the_checkpoint_lock_lives_in_the_namespace_and_never_beside_the_record ... ok
+test filecheckpoint::tests::the_case_probe_of_a_case_sensitive_directory_passes_and_leaves_no_probe_behind ... ok
+test filelock::tests::a_shared_lock_admits_another_reader_and_refuses_a_writer_of_the_same_file ... ok
+test filelock::tests::a_symbolic_link_at_the_lock_name_is_refused_and_its_target_is_untouched ... ok
+test filelock::tests::a_writer_is_refused_through_any_hard_link_while_a_reader_of_another_link_holds_the_file ... ok
+test filelock::tests::an_entry_whose_directory_cannot_be_opened_or_whose_name_is_not_one_name_is_refused ... ok
+test filedevice::tests::a_regular_file_is_locked_on_its_own_file_and_creates_no_lock_for_its_identity ... ok
+test filecheckpoint::tests::stale_files_at_every_name_of_a_replacement_past_a_full_sweep_window_are_removed_and_the_entries_that_cannot_be_removed_stay ... ok
+test filecheckpoint::tests::the_entry_identity_is_the_records_or_none_and_a_link_at_the_name_is_its_own_entry ... ok
+test filedevice::tests::a_different_regular_file_is_not_blocked_by_the_lock_on_another ... ok
+test filelock::tests::a_new_lock_file_is_created_private_and_a_second_attempt_is_held ... ok
+test filedevice::tests::a_regular_file_is_locked_through_a_hard_link_and_released_on_drop ... ok
+test filelock::tests::the_lock_follows_the_device_number_and_other_file_types_are_refused ... ok
+test filelock::tests::a_new_lock_file_in_a_namespace_with_a_default_acl_grants_the_named_group_nothing ... ok
+test filelock::tests::an_injected_mode_failure_is_reached_and_publishes_no_name_and_a_later_take_succeeds ... ok
+test filelock::tests::a_contender_whose_mode_change_fails_at_publication_publishes_no_name_while_its_rival_publishes_one ... ok
+test filelock::tests::a_shared_block_lock_file_admits_readers_and_refuses_a_writer_of_the_same_device_number ... ok
+test filesource::tests::a_copy_of_the_pinned_handle_reads_the_file_that_was_opened_after_its_path_is_replaced ... ok
+test filesource::tests::a_payload_may_name_no_entry_under_the_stores_reserved_prefix ... ok
+test filecheckpoint::tests::stale_staging_files_that_take_every_name_a_replacement_tries_are_removed_and_the_replacement_proceeds ... ok
+test identity::tests::a_block_device_is_identified_by_its_number_whatever_its_node ... ok
+test filelock::tests::one_entry_names_one_lock_whether_it_is_absent_being_created_renamed_over_or_removed ... ok
+test identity::tests::a_block_device_is_never_the_same_as_a_file ... ok
+test identity::tests::a_regular_file_is_identified_by_its_device_and_inode ... ok
+test identity::tests::a_symbolic_link_is_its_own_entry_and_not_its_targets ... ok
+test filelock::tests::contenders_that_all_see_a_new_name_absent_publish_one_file_and_the_others_are_held_by_it ... ok
+test ramdevice::tests::access_is_bounded_by_the_capacity ... ok
+test identity::tests::of_reads_the_identity_of_an_open_file_from_its_handle ... ok
+test roles::tests::a_block_device_is_never_the_same_object_as_a_regular_file ... ok
+test filecheckpoint::tests::the_store_holds_its_entry_lock_across_the_absence_the_creation_and_the_removal_of_the_record ... ok
+test filecheckpoint::tests::the_record_staging_link_is_removed_on_open_even_past_a_full_sweep_window_of_entries_that_cannot_be_removed ... ok
+test filelock::tests::a_second_name_for_one_file_is_a_second_entry_and_only_the_lock_on_the_file_reaches_it ... ok
+test filelock::tests::the_publication_seam_runs_only_when_the_name_is_absent ... ok
+test filesource::tests::the_pin_holds_the_payloads_identity_lock_until_it_is_dropped ... ok
+test filesource::tests::payload_pin_refuses_a_final_symlink_without_touching_the_target ... ok
+test filesource::tests::payload_pin_opens_the_locked_parent_after_it_is_retargeted ... ok
+test filelock::tests::locks_are_taken_in_the_directory_that_was_validated_even_after_its_path_is_replaced ... ok
+test filelock::tests::two_spellings_of_one_directory_reach_one_entry_lock_and_another_directory_has_its_own ... ok
+test filecheckpoint::tests::the_reserved_prefix_is_refused_in_any_ascii_case_and_only_as_a_whole_prefix ... ok
+test filecheckpoint::tests::two_checkpoint_names_in_one_directory_share_one_lock ... ok
+test filesource::tests::the_pin_holds_the_payloads_entry_lock_both_ways_against_another_run ... ok
+test filesource::tests::a_device_that_is_the_pinned_payload_is_refused_as_an_alias_and_not_as_a_held_lock ... ok
+test roles::tests::a_device_that_names_the_records_entry_is_refused_as_an_alias_and_not_as_a_held_lock ... ok
+test roles::tests::a_checkpoint_parent_retargeted_to_a_directory_holding_the_payload_is_refused_as_its_alias ... ok
+test roles::tests::refuse_aliases_compares_identities_in_the_order_the_roles_are_given ... ok
+test roles::tests::a_device_that_is_the_payload_is_refused_as_an_alias_even_while_the_payload_is_held_for_reading ... ok
+test roles::tests::reserved_staging_ancestors_are_rejected_through_parent_aliases ... ok
+test roles::tests::two_block_device_nodes_with_one_device_number_are_one_device_and_another_number_is_another ... ok
+test roles::tests::a_checkpoint_and_a_device_naming_one_entry_refuse_each_other_in_both_orders ... ok
+test roles::tests::a_role_may_name_no_entry_under_the_stores_reserved_prefix ... ok
+test roles::tests::a_record_that_is_a_second_name_for_the_payload_is_refused_once_it_exists ... ok
+test roles::tests::a_payload_path_replaced_after_it_was_opened_is_compared_by_the_file_that_was_opened ... ok
+test roles::tests::an_old_image_that_is_a_named_pipe_is_refused_without_waiting_for_a_writer ... ok
+test roles::tests::two_entries_of_one_directory_are_held_apart_from_each_other ... ok
+test roles::tests::an_old_image_that_is_the_device_under_a_retargeted_parent_is_refused_and_the_device_is_untouched ... ok
+test roles::tests::an_old_image_held_for_writing_by_another_run_is_refused_and_the_device_lock_it_took_is_released ... ok
+test roles::tests::a_checkpoint_parent_retargeted_after_the_payload_is_opened_is_checked_in_the_directory_it_now_names ... ok
+test roles::tests::an_old_image_read_by_another_run_is_shared_with_this_run_but_a_writer_on_it_is_refused ... ok
+test roles::tests::an_unrelated_device_and_old_image_proceed_while_another_run_holds_a_third_file ... ok
+test roles::tests::distinct_roles_open_with_no_record_and_no_alias ... ok
+test roles::tests::a_run_naming_another_runs_checkpoint_entry_as_its_device_is_refused_before_the_entry_is_opened ... ok
+test roles::tests::role_opens_and_entry_locks_use_the_same_parent_after_retargeting ... ok
+test roles::tests::an_old_image_naming_another_runs_checkpoint_entry_is_refused_before_it_is_opened ... ok
+test roles::tests::final_symlinks_are_rejected_for_device_and_old_image ... ok
+test filecheckpoint::tests::a_torn_marker_in_an_abandoned_initialization_is_discarded_and_made_again ... ok
+test filecheckpoint::tests::untrusted_preexisting_staging_namespaces_are_refused_without_changes ... ok
+test filecheckpoint::tests::an_initialization_interrupted_at_any_step_is_completed_by_the_next_open_and_never_published_without_its_marker ... ok
+test filecheckpoint::tests::an_initialization_left_with_umask_modes_is_completed_by_the_next_open_at_every_step ... ok
+
+test result: ok. 153 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.36s
+
+     Running unittests src/main.rs (/tmp/ga-phase0/head-target/release/deps/ota_apply-10f556c84133a598)
+
+running 5 tests
+test tests::an_uncertain_reset_tells_the_operator_to_run_the_reset_again_and_not_to_apply ... ok
+test tests::a_reader_of_exactly_the_limit_is_read_whole_and_a_byte_more_is_refused_as_it_grows ... ok
+test tests::growing_the_buffer_within_the_limit_never_takes_its_capacity_past_the_limit ... ok
+test tests::a_read_error_is_reported_with_its_path_and_no_data_is_returned ... ok
+test tests::a_regular_file_over_its_limit_is_refused_before_it_is_read_and_one_at_the_limit_is_read ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/args.rs (/tmp/ga-phase0/head-target/release/deps/args-e99c7964172b783a)
+
+running 7 tests
+test support::lock_holder_child ... ok
+test the_lock_namespace_is_a_required_option ... ok
+test help_and_version_succeed_without_required_arguments ... ok
+test missing_arguments_unknown_flags_and_removed_profiles_are_usage_errors ... ok
+test malformed_and_out_of_range_resource_values_are_usage_errors ... ok
+test zero_operations_allows_a_noop_and_missing_files_exit_one ... ok
+test explicit_caps_reject_a_valid_signed_payload_before_writing_on_both_paths ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/cli.rs (/tmp/ga-phase0/head-target/release/deps/cli-09c1e62458921782)
+
+running 15 tests
+test support::lock_holder_child ... ok
+test the_checkpoint_option_is_required ... ok
+test the_target_id_is_required_and_malformed_values_are_usage_errors ... ok
+test oversized_manifest_declaration_fails_cleanly_under_memory_limit_on_both_paths ... ok
+test invalid_later_operation_leaves_device_untouched ... ok
+test oversized_metadata_signature_declaration_fails_cleanly_under_memory_limit ... ok
+test an_old_image_that_is_the_device_is_refused_by_name_and_by_symlink ... ok
+test source_copy_without_an_old_image_is_refused_with_the_device_untouched ... ok
+test device_too_small_for_the_update_is_rejected_by_both_paths_without_a_write ... ok
+test a_sparse_checkpoint_of_any_size_fails_cleanly_under_the_memory_limit ... ok
+test an_interrupted_stream_resumes_under_its_original_target_id_only ... ok
+test a_full_image_payload_applies_with_no_old_image_on_both_paths ... ok
+test source_copy_applies_from_a_separate_old_image_on_both_paths ... ok
+test trailing_byte_after_a_signed_payload_is_refused_with_and_without_keys ... ok
+test a_completed_update_is_checked_again_and_refused_once_its_target_has_changed ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s
+
+     Running tests/durability.rs (/tmp/ga-phase0/head-target/release/deps/durability-c4fd91415e8649a6)
+
+running 3 tests
+test support::lock_holder_child ... ok
+test a_power_cut_that_loses_the_first_rename_leaves_no_record_and_the_next_run_completes_the_update ... ok
+test a_record_whose_rename_is_not_confirmed_is_refused_by_retries_until_a_sync_works_and_writes_nothing_meanwhile ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/e2e.rs (/tmp/ga-phase0/head-target/release/deps/e2e-325e60ea41a1db56)
+
+running 7 tests
+test device_capacity_larger_than_the_new_image_is_accepted ... ok
+test delta_classes_and_roundtrip ... ok
+test file_device_roundtrip ... ok
+test streaming_roundtrip_on_file_bindings ... ok
+test tampered_signature_is_detected ... ok
+test streaming_resume_converges_after_a_lost_stream ... ok
+test tampered_blob_is_detected ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.02s
+
+     Running tests/limits.rs (/tmp/ga-phase0/head-target/release/deps/limits-0c73465d30c94e12)
+
+running 7 tests
+test support::lock_holder_child ... ok
+test a_named_pipe_is_refused_as_a_payload_without_waiting_for_a_writer ... ok
+test an_oversized_key_file_is_refused_before_it_is_parsed_and_the_payload_limit_does_not_change_it ... ok
+test a_payload_over_the_buffered_limit_is_refused_before_any_write_and_names_the_way_out ... ok
+test a_character_device_is_refused_as_a_payload_and_as_a_key_without_a_read ... ok
+test a_payload_of_exactly_the_buffered_limit_applies_and_one_byte_less_is_refused ... ok
+test a_streamed_apply_is_not_bound_by_the_buffered_limit ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/locks.rs (/tmp/ga-phase0/head-target/release/deps/locks-1b0720ad085f5d60)
+
+running 21 tests
+test support::lock_holder_child ... ok
+test two_device_nodes_for_one_block_device_contend_through_the_namespace ... ok
+test a_checkpoint_record_inside_the_lock_namespace_is_refused_with_no_write ... ok
+test a_checkpoint_named_with_the_reserved_prefix_is_refused_before_any_lock_or_write ... ok
+test a_missing_or_group_accessible_lock_namespace_refuses_the_run_before_any_write ... ok
+test a_checkpoint_lock_file_that_is_a_symbolic_link_is_refused_with_no_write ... ok
+test an_old_sidecar_lock_beside_the_record_is_neither_used_nor_removed ... ok
+test the_checkpoint_lock_is_a_private_kept_file_in_the_namespace_and_never_beside_the_record ... ok
+test a_checkpoint_held_by_another_run_refuses_a_reset_and_keeps_the_record ... ok
+test a_checkpoint_reached_through_a_symbolic_link_to_its_directory_is_the_same_lock ... ok
+test a_streamed_payload_that_another_run_writes_is_refused_before_it_is_read ... ok
+test a_checkpoint_held_by_another_run_refuses_another_target_on_both_paths_and_writes_nothing ... ok
+test a_checkpoint_named_like_a_lock_file_is_refused_while_its_directory_is_held_and_writes_nothing ... ok
+test a_run_refused_on_its_device_leaves_the_checkpoint_free_for_the_next_run ... ok
+test a_streamed_payload_that_another_run_reads_is_shared_and_the_streamed_update_proceeds ... ok
+test an_old_image_that_another_run_reads_is_shared_with_this_run_and_refuses_a_writer_of_it ... ok
+test an_old_image_that_another_run_writes_is_refused_on_both_paths_and_nothing_is_written ... ok
+test an_old_image_and_a_device_that_no_other_run_names_proceed_while_unrelated_files_are_held ... ok
+test an_unrelated_checkpoint_and_device_pair_proceeds_while_another_pair_is_held ... ok
+test role_entry_locks_exclude_checkpoint_creation_replacement_and_reset_but_not_other_entries ... ok
+test another_runs_checkpoint_entry_refuses_each_role_before_it_is_used ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+
+     Running tests/policy.rs (/tmp/ga-phase0/head-target/release/deps/policy-e0d681711d7ae20a)
+
+running 11 tests
+test support::lock_holder_child ... ok
+test strict_is_the_default_and_refuses_a_run_with_no_key ... ok
+test a_release_below_the_floor_is_refused_before_any_write ... ok
+test a_checkpoint_with_a_second_name_is_refused_before_it_is_read ... ok
+test a_checkpoint_that_is_the_device_by_hard_link_is_refused_by_identity ... ok
+test a_checkpoint_that_is_a_symbolic_link_is_refused_and_its_target_is_untouched ... ok
+test a_checkpoint_that_is_the_payload_by_hard_link_is_refused_on_both_paths_before_any_write ... ok
+test a_hard_link_to_a_locked_device_shares_its_lock ... ok
+test a_device_held_by_another_process_refuses_every_checkpoint_name_and_leaves_it_untouched ... ok
+test a_different_device_is_not_blocked_by_another_devices_lock ... ok
+test a_verified_run_reports_verified_and_the_development_run_reports_applied ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running tests/reset.rs (/tmp/ga-phase0/head-target/release/deps/reset-7abee2031924ba90)
+
+running 14 tests
+test support::lock_holder_child ... ok
+test a_reset_does_not_open_the_old_image_so_a_missing_source_path_does_not_fail_it ... ok
+test a_reset_does_not_refuse_a_source_that_aliases_the_device ... ok
+test a_damaged_checkpoint_is_refused_by_reset_and_never_deleted ... ok
+test a_failed_clear_keeps_the_record_and_a_retry_succeeds ... ok
+test a_removal_not_confirmed_durable_fails_the_reset_and_leaves_the_record_absent ... ok
+test a_streamed_reset_of_a_payload_over_the_buffered_limit_succeeds_where_the_buffered_reset_is_refused ... ok
+test a_streamed_reset_needs_no_payload_body_while_a_buffered_reset_must_read_the_whole_payload ... ok
+test reset_without_a_checkpoint_succeeds_without_changing_the_device_on_both_paths ... ok
+test reset_is_refused_while_another_process_holds_the_device_on_both_paths ... ok
+test reset_refuses_another_target_or_payload_on_both_paths ... ok
+test a_completed_destination_independent_update_resets_on_both_paths_and_the_next_run_applies_again ... ok
+test a_base_dependent_reset_still_refuses_for_its_own_base_whatever_source_is_named ... ok
+test a_base_dependent_reset_requires_its_old_image_on_both_paths ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.40s
+
+     Running tests/staging_umask.rs (/tmp/ga-phase0/head-target/release/deps/staging_umask-a7225acc5a754348)
+
+running 1 test
+test a_staging_directory_interrupted_under_a_restrictive_umask_is_completed_by_the_next_open ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s
+
+     Running tests/stream-locks.rs (/tmp/ga-phase0/head-target/release/deps/stream_locks-271bc0c969ee1646)
+
+running 3 tests
+test a_writer_is_refused_through_the_completion_record_of_a_fresh_streamed_run ... ok
+test a_writer_is_refused_through_the_final_verification_of_a_fresh_streamed_run ... ok
+test a_writer_is_refused_through_the_reverification_of_an_already_complete_streamed_run ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/umask.rs (/tmp/ga-phase0/head-target/release/deps/umask-c0e156ed5ffce098)
+
+running 1 test
+test lock_and_record_files_are_0600_and_reopen_under_a_restrictive_umask ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running unittests src/lib.rs (/tmp/ga-phase0/head-target/release/deps/delta_update_cli_args-db8e88c20a13b52a)
+
+running 3 tests
+test tests::defaults_match_embedded ... ok
+test tests::every_limit_is_explicit_and_independent ... ok
+test tests::caps_accept_zero_and_native_maximum_but_reject_invalid_integers ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/ga-phase0/head-target/release/deps/delta_update_client-503c4abc0f070367)
+
+running 36 tests
+test apply::tests::unverified_blob_region_must_match_the_manifest ... ok
+test apply::tests::unsigned_payload_is_refused_when_verification_is_required ... ok
+test checkpoint::tests::a_replacement_whose_sync_fails_is_visible_but_lost_by_a_crash_until_confirmed ... ok
+test checkpoint::tests::a_removal_that_is_not_confirmed_durable_is_reported_and_the_record_is_gone ... ok
+test checkpoint::tests::a_record_round_trips_through_its_bytes ... ok
+test checkpoint::tests::a_version_one_record_still_decodes_and_a_mismatch_round_trips ... ok
+test checkpoint::tests::a_failed_confirmation_leaves_the_record_unconfirmed_and_refuses_again ... ok
+test checkpoint::tests::clear_removes_the_record_and_can_fail_without_removing_it ... ok
+test checkpoint::tests::a_successful_replacement_confirms_the_one_before_it ... ok
+test checkpoint::tests::confirm_absent_of_an_absent_record_reports_uncertainty_until_the_sync_works ... ok
+test checkpoint::tests::confirm_stored_makes_a_visible_record_durable_and_a_crash_then_keeps_it ... ok
+test checkpoint::tests::confirm_stored_of_a_durable_record_writes_nothing_and_succeeds ... ok
+test checkpoint::tests::wrong_length_and_unknown_version_are_refused ... ok
+test checkpoint::tests::every_single_byte_corruption_is_refused ... ok
+test checkpoint::tests::the_memory_store_replaces_and_can_fail_once ... ok
+test checkpoint::tests::confirm_absent_refuses_a_stored_record_and_leaves_it_in_place ... ok
+test policy::tests::a_volatile_floor_only_moves_up ... ok
+test stream::tests::unsupported_operation_is_refused_by_prepare ... ok
+test stream::tests::verified_stream_requires_both_signature_messages ... ok
+test apply::tests::an_interrupted_update_resumes_from_its_checkpoint ... ok
+test apply::tests::a_destination_independent_update_applies_from_unrelated_contents ... ok
+test stream::tests::resume_converges_after_an_interrupted_stream ... ok
+test apply::tests::verified_payload_applies_to_a_write_only_sink ... ok
+test apply::tests::stale_device_fails_preflight_before_any_write ... ok
+test stream::tests::device_capacity_is_bound_before_any_read_or_write ... ok
+test apply::tests::flush_failure_is_reported_on_both_paths ... ok
+test apply::tests::verified_tampering_is_rejected_before_any_write ... ok
+test apply::tests::a_checkpoint_of_another_target_is_refused_with_no_write ... ok
+test apply::tests::unverified_blob_tampering_is_caught_by_its_hash_before_any_write ... ok
+test stream::tests::profile_limits_are_enforced_before_the_manifest_is_read ... ok
+test stream::tests::truncated_and_trailing_streams_are_rejected ... ok
+test stream::tests::unverified_tampering_is_detected_after_the_write ... ok
+test apply::tests::lost_writes_are_detected_by_the_post_flight_hash ... ok
+test stream::tests::flush_failure_is_reported_by_the_stream ... ok
+test apply::tests::insufficient_device_capacity_is_rejected_with_zero_writes ... ok
+test stream::tests::streamed_apply_matches_the_buffered_pipeline ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.10s
+
+     Running tests/copy.rs (/tmp/ga-phase0/head-target/release/deps/copy-96f776b137634196)
+
+running 14 tests
+test a_copy_without_the_old_image_is_refused_with_no_write ... ok
+test a_copy_outside_the_recorded_old_partition_is_refused_at_prepare ... ok
+test an_old_image_with_the_wrong_geometry_is_refused_with_no_write ... ok
+test resume_copies_only_the_blocks_not_yet_written ... ok
+test a_changed_source_fails_its_copy_hash_before_any_write ... ok
+test a_changed_old_image_fails_its_whole_hash_before_any_write ... ok
+test many_destinations_may_reuse_one_source_block ... ok
+test a_copy_round_trips_through_every_path ... ok
+test validation_reads_the_source_and_replay_reads_it_again ... ok
+test reapplying_a_completed_copy_writes_nothing ... ok
+test a_sink_plan_under_tight_extent_limits_falls_back_and_applies_losslessly ... ok
+test a_fragmented_plan_for_a_write_only_target_meets_the_operation_budget_and_applies_losslessly ... ok
+test a_generated_plan_that_keeps_bytes_is_refused_by_a_write_only_sink ... ok
+test the_generator_turns_relocated_regions_into_copies_that_round_trip ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.31s
+
+     Running tests/durability.rs (/tmp/ga-phase0/head-target/release/deps/durability-05ed59e8e86b84e3)
+
+running 3 tests
+test a_reset_does_not_wait_for_a_confirmation_and_removes_the_record_it_checked ... ok
+test a_power_cut_that_loses_an_unconfirmed_record_resumes_from_the_record_that_was_durable ... ok
+test an_unconfirmed_record_is_never_resumed_and_no_write_follows_its_refusal ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/frames.rs (/tmp/ga-phase0/head-target/release/deps/frames-7daeecacca85e7a5)
+
+running 6 tests
+test a_malformed_frame_with_a_matching_hash_is_refused_before_its_write ... ok
+test one_operation_can_mix_compressed_and_raw_frames ... ok
+test incompressible_blocks_fall_back_to_raw_replace ... ok
+test compressible_blocks_are_replaced_by_frames_and_round_trip ... ok
+test a_stream_cut_inside_a_frame_resumes_to_the_target ... ok
+test reapplying_a_completed_frame_operation_writes_nothing ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.04s
+
+     Running tests/full.rs (/tmp/ga-phase0/head-target/release/deps/full-75f8f798df45fa6b)
+
+running 9 tests
+test a_frame_table_that_does_not_describe_its_blob_is_refused_before_any_write ... ok
+test a_corrupt_raw_block_on_the_streamed_path_is_refused_after_its_writes ... ok
+test a_full_payload_applies_to_a_write_only_sink_with_no_old_image ... ok
+test an_undersized_device_is_refused_with_no_write_on_both_pipelines ... ok
+test a_completed_full_update_writes_nothing_when_run_again_and_refuses_an_altered_target ... ok
+test a_failed_flush_resumes_at_the_operation_it_did_not_commit ... ok
+test a_failed_checkpoint_replacement_resumes_from_the_previous_record ... ok
+test a_cut_at_every_write_resumes_to_the_new_image_on_both_pipelines ... ok
+test a_full_payload_updates_any_starting_contents_through_both_pipelines ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/model.rs (/tmp/ga-phase0/head-target/release/deps/model-f8f8db230a51519a)
+
+running 1 test
+test random_programs_match_the_model_on_every_path ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running tests/peak_completed.rs (/tmp/ga-phase0/head-target/release/deps/peak_completed-87a25955b13cf328)
+
+running 1 test
+test a_completed_compressed_update_allocates_no_staging_frame ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/peak_memory.rs (/tmp/ga-phase0/head-target/release/deps/peak_memory-02d431282cad67d9)
+
+running 1 test
+test decode_and_verify_peaks_stay_below_the_model ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/peak_stream.rs (/tmp/ga-phase0/head-target/release/deps/peak_stream-a304229639e13048)
+
+running 1 test
+test streamed_phase_peaks_stay_within_their_estimates ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.65s
+
+     Running tests/policy.rs (/tmp/ga-phase0/head-target/release/deps/policy-548d5c56aefa5d29)
+
+running 14 tests
+test a_duplicate_release_version_is_refused_by_the_scanner ... ok
+test strict_refuses_a_payload_without_a_release_version_before_any_write ... ok
+test strict_refuses_a_new_image_without_its_signed_hash_before_any_write ... ok
+test a_write_only_apply_is_applied_and_never_verified ... ok
+test strict_refuses_unauthenticated_metadata_before_any_write ... ok
+test a_write_only_sink_refuses_a_kept_sparse_chunk_and_leaves_the_checkpoint_as_it_was ... ok
+test development_applies_unauthenticated_metadata_but_never_claims_verification ... ok
+test a_strict_update_with_the_base_and_a_release_is_verified ... ok
+test a_failing_floor_read_refuses_the_update_before_any_write ... ok
+test a_destination_independent_update_is_verified_from_unrelated_contents_under_strict ... ok
+test the_streamed_strict_path_refuses_before_it_opens_the_payload ... ok
+test a_wrong_base_is_refused_before_the_first_write_even_with_an_old_image ... ok
+test strict_refuses_a_base_dependent_update_that_records_no_old_hash ... ok
+test strict_refuses_a_release_below_the_floor_and_accepts_the_floor_itself ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ranges.rs (/tmp/ga-phase0/head-target/release/deps/ranges-353d972dbc090f5b)
+
+running 4 tests
+test an_operation_may_write_the_last_byte_and_a_single_byte ... ok
+test overlapping_operations_resolve_to_the_last_write ... ok
+test a_large_range_costs_one_write_per_chunk_and_applies_through_bounded_buffers ... ok
+test unaligned_short_and_out_of_order_ranges_match_the_model ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/recovery.rs (/tmp/ga-phase0/head-target/release/deps/recovery-c62cbcb9440147c2)
+
+running 10 tests
+test a_stream_with_a_bad_payload_signature_is_never_complete_and_a_good_stream_completes ... ok
+test a_retry_that_finds_no_record_confirms_its_absence_before_it_reports_success ... ok
+test a_reset_whose_removal_is_not_confirmed_durable_says_so_and_leaves_no_record ... ok
+test a_final_mismatch_is_recorded_and_refused_on_every_later_run ... ok
+test an_interrupted_reset_keeps_the_mismatch_and_a_retry_completes ... ok
+test a_destination_independent_update_resets_from_any_contents_and_then_verifies ... ok
+test a_trailer_and_a_truncated_stream_fail_after_the_writes_with_a_fresh_checkpoint_each_time ... ok
+test a_failed_mismatch_record_leaves_awaiting_final_and_the_next_run_repeats_the_check ... ok
+test a_base_dependent_reset_requires_the_old_image_on_the_device_first ... ok
+test reset_refuses_another_target_and_a_damaged_record_without_clearing_it ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/regressions.rs (/tmp/ga-phase0/head-target/release/deps/regressions-66cee1c4abbf5d9e)
+
+running 11 tests
+test missing_operation_type_is_rejected ... ok
+test explicit_replace_type_zero_is_accepted ... ok
+test later_overlapping_operation_wins_on_both_pipelines ... ok
+test late_unsupported_operation_writes_nothing ... ok
+test oversized_metadata_signature_declaration_is_refused_on_both_pipelines ... ok
+test overflowing_extents_are_errors_not_panics ... ok
+test oversized_payload_signature_declaration_is_refused_on_both_pipelines ... ok
+test zero_operation_hash_must_be_absent_empty_or_the_empty_blob_digest ... ok
+test wrong_length_data_hash_is_rejected ... ok
+test streamed_trailing_byte_is_refused_only_at_end_of_stream ... ok
+test trailing_byte_after_a_signed_payload_is_refused_with_or_without_authentication ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+
+     Running tests/resume.rs (/tmp/ga-phase0/head-target/release/deps/resume-586e6d031a768f50)
+
+running 17 tests
+test a_damaged_checkpoint_is_refused_with_no_write ... ok
+test a_completed_update_without_a_recorded_new_hash_is_not_checked_against_the_target ... ok
+test a_checkpoint_of_another_target_is_refused_with_no_write ... ok
+test a_cut_during_operation_zero_is_recorded_as_initialized_and_resumes_without_a_preflight ... ok
+test zero_data_operations_advance_the_index_without_moving_the_offset ... ok
+test a_stale_device_with_no_checkpoint_is_refused_by_the_preflight ... ok
+test a_source_opened_at_the_wrong_offset_is_refused_and_the_record_is_kept ... ok
+test a_resume_during_final_verification_writes_nothing_and_checks_the_signature ... ok
+test the_record_matches_the_operation_it_describes ... ok
+test a_resume_checks_the_payload_signature_over_the_restored_hash_state ... ok
+test a_checkpoint_of_another_payload_is_refused_with_no_write ... ok
+test a_failed_flush_resumes_at_the_operation_it_did_not_commit ... ok
+test a_failed_checkpoint_replacement_resumes_from_the_previous_record ... ok
+test a_cut_at_every_write_resumes_to_the_target_on_both_paths ... ok
+test a_completed_update_still_refuses_a_damaged_stream_ending ... ok
+test a_completed_update_refuses_a_target_altered_since_completion ... ok
+test a_completed_update_resumes_with_no_write_when_the_target_is_unchanged ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.54s
+
+     Running tests/sizes.rs (/tmp/ga-phase0/head-target/release/deps/sizes-9fca6a3b47dfcc04)
+
+running 7 tests
+test in_place_grow_and_shrink_hash_only_image_prefixes_and_keep_capacity_and_tail ... ok
+test untouched_and_sparse_kept_bytes_are_target_bytes_not_implicit_source_copies ... ok
+test insufficient_new_capacity_fails_before_writes ... ok
+test interrupted_grow_and_shrink_resume_without_rechecking_the_modified_old_prefix ... ok
+test independent_ab_source_can_be_larger_or_smaller_than_the_destination ... ok
+test prepared_partition_label_is_available_before_binding_storage ... ok
+test signed_generated_grow_shrink_and_full_payloads_apply_on_larger_storage ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.64s
+
+     Running tests/sparse.rs (/tmp/ga-phase0/head-target/release/deps/sparse-dfbe41ef74c4fcfa)
+
+running 11 tests
+test a_malformed_block_map_is_refused_before_any_access ... ok
+test a_malformed_frame_inside_a_span_leaves_earlier_blocks_written ... ok
+test malformed_sparse_after_a_valid_operation_fails_preparation ... ok
+test oversized_frame_table_and_block_map_are_refused_at_preparation ... ok
+test a_one_byte_block_raw_replacement_with_zero_and_nonzero_bytes_applies_through_both_pipelines ... ok
+test signed_empty_sparse_blob_is_refused_before_any_access_unless_the_digest_is_empty ... ok
+test zero_blocks_inside_a_span_need_no_blob_bytes ... ok
+test kept_blocks_are_never_written ... ok
+test reapplying_a_completed_sparse_operation_writes_nothing ... ok
+test resume_inside_a_span_skips_kept_and_matching_blocks ... ok
+test alternating_changed_and_kept_blocks_stay_one_sparse_operation ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.07s
+
+     Running tests/target_copy.rs (/tmp/ga-phase0/head-target/release/deps/target_copy-82809a9e98c5f596)
+
+running 5 tests
+test an_in_target_copy_needs_a_readable_target ... ok
+test a_cyclic_copy_within_one_operation_is_refused ... ok
+test a_copy_onto_its_own_source_is_refused_before_any_write ... ok
+test a_source_that_does_not_match_its_hash_is_refused_before_the_copy_writes ... ok
+test an_in_target_copy_matches_the_model_on_both_paths ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/target_scale.rs (/tmp/ga-phase0/head-target/release/deps/target_scale-6a220cb6c999d387)
+
+running 8 tests
+test bench_report ... ignored
+test entirely_unchanged_image_round_trips_with_no_writes ... ok
+test entirely_zeroed_image_round_trips ... ok
+test alternating_replacement_and_zero_runs_round_trip ... ok
+test alternating_changed_and_unchanged_blocks_round_trip ... ok
+test entirely_changed_image_round_trips ... ok
+test an_interrupted_project_payload_resumes_at_target_scale ... ok
+test project_operations_round_trip_at_target_scale ... ok
+
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.68s
+
+     Running unittests src/lib.rs (/tmp/ga-phase0/head-target/release/deps/delta_update_generator-ee39daf683d6f618)
+
+running 122 tests
+test builder::tests::a_destination_total_is_the_sum_of_its_ranges ... ok
+test check::tests::gather_and_scatter_follow_stream_order ... ok
+test builder::tests::an_overflowing_destination_total_is_refused ... ok
+test check::tests::a_frame_buffer_is_the_largest_chunk_the_operation_needs ... ok
+test builder::tests::build_refuses_an_overflowing_destination_without_allocating_its_data ... ok
+test compress::tests::a_charge_that_overflows_the_total_is_refused_and_changes_nothing ... ok
+test compress::tests::a_program_the_profile_cannot_count_is_refused_before_any_mapping_or_analysis ... ok
+test compress::tests::a_cached_encoding_is_kept_only_while_it_fits_the_budget ... ok
+test compress::tests::a_full_operation_refuses_another_encoding_and_keeps_its_entries ... ok
+test compress::tests::a_kept_encoding_is_admitted_at_its_exact_charge_and_refused_one_byte_short ... ok
+test check::tests::scatter_from_the_middle_of_a_stream_starts_at_that_position ... ok
+test compress::tests::a_sparse_operation_with_no_blob_carries_the_digest_of_no_bytes ... ok
+test compress::tests::an_empty_table_owns_no_buffer_and_costs_only_the_entry_buffer ... ok
+test compress::tests::an_expired_control_interrupts_the_analysis_and_a_new_encoding ... ok
+test compress::tests::encodings_leave_copies_and_zeros_and_the_operation_order_alone ... ok
+test compress::tests::later_encodings_of_an_operation_are_charged_only_their_tables ... ok
+test compress::tests::the_analysis_refuses_a_candidate_past_its_bound ... ok
+test compress::tests::operations_and_levels_are_kept_apart_and_each_is_charged ... ok
+test compress::tests::the_analysis_charges_an_entry_slot_for_each_data_operation_and_the_repair ... ok
+test compress::tests::the_analysis_budget_is_exact_at_its_boundary ... ok
+test compress::tests::the_first_kept_encoding_is_charged_its_entry_buffer_and_its_table ... ok
+test compress::tests::the_retained_charges_cannot_wrap ... ok
+test control::tests::a_zero_minimum_gain_never_stops_on_stagnation ... ok
+test control::tests::an_unbounded_control_never_halts ... ok
+test control::tests::improvements_are_timestamped_when_they_are_recorded ... ok
+test control::tests::progress_counts_small_gains_that_add_up_in_a_window ... ok
+test control::tests::progress_does_not_stop_before_a_full_window_has_elapsed ... ok
+test control::tests::progress_records_only_improvements ... ok
+test control::tests::the_deadline_halts_a_checkpoint_at_exactly_the_limit ... ok
+test evaluate::tests::a_complete_program_is_not_repaired ... ok
+test evaluate::tests::a_profile_admits_a_signature_exactly_at_its_limits ... ok
+test evaluate::tests::a_profile_refuses_a_signature_it_cannot_hold_before_any_program_is_considered ... ok
+test evaluate::tests::a_signature_past_the_profile_is_refused_before_its_message_is_built ... ok
+test evaluate::tests::a_signature_reservation_that_cannot_exist_is_an_error_not_an_allocation ... ok
+test compress::tests::the_analysis_is_charged_by_the_capacity_its_buffers_hold ... ok
+test compress::tests::programs_the_profile_never_admits_yield_nothing ... ok
+test evaluate::tests::an_expired_control_interrupts_an_evaluation_whose_runs_all_match ... ok
+test evaluate::tests::an_incomplete_program_is_repaired_by_a_raw_suffix ... ok
+test compress::tests::analysed_trials_size_the_manifest_across_the_varint_boundaries ... ok
+test full::tests::a_data_run_past_the_operation_limit_rejects_the_candidate ... ok
+test full::tests::a_candidate_that_covers_the_image_at_the_limit_reads_no_further_run ... ok
+test full::tests::a_frame_table_split_past_the_operation_limit_rejects_the_candidate ... ok
+test full::tests::a_refused_candidate_reads_no_run_from_the_one_it_refuses ... ok
+test compress::tests::identical_candidates_are_tried_once ... ok
+test full::tests::a_zero_run_past_the_operation_limit_rejects_the_candidate ... ok
+test full::tests::each_count_limit_admits_its_own_value_and_no_more ... ok
+test gpu::tests::a_failed_hardware_attempt_falls_back_to_the_software_device ... ok
+test full::tests::runs_join_chunks_of_one_kind_and_keep_the_partial_last_chunk ... ok
+test gpu::tests::device_memory_is_preferred_over_host_visible_memory_for_the_search_state ... ok
+test gpu::tests::hardware_candidates_come_before_the_software_device ... ok
+test full::tests::the_direct_builder_refuses_a_block_size_it_cannot_cut_by ... ok
+test gpu_layout::tests::a_program_survives_a_round_trip_through_a_slot ... ok
+test gpu::tests::table_shapes_grow_their_stride_until_they_fit_the_cap ... ok
+test gpu_layout::tests::the_layout_matches_the_shader_header ... ok
+test mapper::tests::a_finalized_raw_replacement_carries_its_extents_in_declared_order ... ok
+test mapper::tests::a_raw_baseline_is_complete_for_any_length ... ok
+test mapper::tests::a_deadline_inside_one_chunk_stops_after_bounded_work ... ok
+test gpu_layout::tests::encodings_the_chromosome_does_not_carry_and_oversize_values_are_refused ... ok
+test mapper::tests::a_raw_replacement_is_replayed_per_extent_not_per_codec_chunk ... ok
+test mapper::tests::a_replay_interrupted_inside_a_chunk_returns_no_mapping ... ok
+test mapper::tests::a_zero_run_then_patch_completes_when_the_patch_overwrites ... ok
+test mapper::tests::an_expired_control_builds_no_chunk_of_a_many_piece_operation ... ok
+test mapper::tests::an_in_target_copy_onto_its_own_source_is_refused ... ok
+test full::tests::a_frame_table_that_reaches_the_budget_closes_its_operation ... ok
+test mapper::tests::one_byte_chunks_over_many_short_extents_are_timed ... ignored
+test mapper::tests::an_in_target_copy_reads_what_an_earlier_write_left ... ok
+test mapper::tests::an_incomplete_program_reports_exactly_its_mismatches ... ok
+test mapper::tests::source_copies_read_the_old_image_at_any_offset ... ok
+test gpu::tests::when_every_device_fails_the_failure_lists_each_attempt ... ok
+test mapper::tests::sparse_chunks_that_already_hold_the_new_bytes_are_kept ... ok
+test memory::tests::a_bounded_comparison_checks_the_control_before_each_piece ... ok
+test memory::tests::a_clipped_run_keeps_its_origin_offset ... ok
+test memory::tests::a_fresh_target_is_the_old_image ... ok
+test memory::tests::all_zero_finds_one_nonzero_byte_in_any_piece ... ok
+test memory::tests::an_empty_image_has_no_runs_and_no_mismatches ... ok
+test memory::tests::an_expired_control_interrupts_a_run_held_as_new_bytes_at_its_own_offset ... ok
+test memory::tests::an_expired_control_interrupts_a_run_that_already_matches ... ok
+test memory::tests::an_expired_control_interrupts_the_keep_and_zero_tests ... ok
+test memory::tests::holds_new_compares_contents_not_origins ... ok
+test memory::tests::later_writes_win_and_runs_stay_a_partition ... ok
+test memory::tests::mismatches_merge_across_run_boundaries ... ok
+test program::tests::an_expired_control_cuts_no_chunk_and_moves_no_cursor ... ok
+test program::tests::cutting_one_byte_chunks_over_many_extents_is_timed ... ignored
+test program::tests::an_interrupted_cut_leaves_the_cursor_where_it_was_and_the_next_cut_is_whole ... ok
+test program::tests::raw_baseline_is_one_replace_or_nothing ... ok
+test program::tests::overflowing_totals_are_none ... ok
+test program::tests::slices_of_one_stream_concatenate_to_the_stream ... ok
+test program::tests::stream_slices_follow_declared_order_across_extents ... ok
+test program::tests::the_checked_cut_is_the_iterator_cut_under_an_unbounded_control ... ok
+test program::tests::the_chunk_cursor_cuts_exactly_as_slice_stream_does ... ok
+test program::tests::zero_length_extents_count_toward_the_checks ... ok
+test compress::tests::incompressible_data_stays_raw_when_framing_costs_more ... ok
+test tests::bad_block_sizes_are_refused_before_searching ... ok
+test tests::build_payload_rejects_bad_name_or_key ... ok
+test program::tests::zipped_streams_pair_equal_lengths_in_order ... ok
+test compress::tests::a_refused_analysis_decides_as_the_analysed_pass_does ... ok
+test tests::an_empty_image_is_a_valid_empty_payload ... ok
+test compress::tests::a_sparse_encoding_keeps_unchanged_chunks_that_the_raw_baseline_rewrote ... ok
+test tests::identical_images_need_no_operations ... ok
+test verification::invalid_time_settings_are_refused_before_the_search ... ok
+test compress::tests::an_encoding_rescues_a_raw_candidate_the_manifest_limit_refuses ... ok
+test compress::tests::the_result_is_never_larger_than_the_smallest_admissible_raw_candidate ... ok
+test verification::a_deadline_before_the_search_starts_leaves_the_raw_baseline_as_the_answer ... ok
+test verification::compression_yields_between_pieces_of_one_large_chunk ... ok
+test evaluate::tests::the_raw_baseline_is_admitted_at_the_length_of_the_payload_it_emits ... ok
+test compress::tests::an_analysis_is_not_refused_because_the_raw_program_is_refused ... ok
+test compress::tests::a_repair_too_large_to_retain_is_refused_after_one_replay ... ok
+test compress::tests::a_compressible_replacement_is_framed_or_sparse_and_smaller_than_raw ... ok
+test compress::tests::analysed_trials_match_ordinary_evaluations_on_every_variant ... ok
+test compress::tests::kept_and_recomputed_encodings_decide_exactly_alike_at_every_budget ... ok
+test compress::tests::reused_trials_decide_exactly_as_ordinary_evaluations ... ok
+test verification::the_run_length_model_agrees_with_a_flat_replay_on_every_small_program ... ok
+test gpu::tests::software_device_is_the_cpu_type_lavapipe_device ... ok
+test verification::progress_records_improvements_at_their_own_times ... ok
+test tests::a_signed_payload_verifies_and_replays_to_the_new_image ... ok
+test tests::key_size_drives_signature_slot_sizes ... ok
+test verification::the_search_stops_for_the_reason_it_met ... ok
+test gpu::tests::concurrent_opens_and_drops_all_succeed ... ok
+test tests::an_odd_length_image_with_a_partial_final_chunk_round_trips ... ok
+test verification::every_finalist_is_a_valid_payload_of_its_exact_raw_size ... ok
+test verification::the_device_replay_agrees_with_a_flat_replay_on_every_small_program ... ok
+test verification::deadlines_at_every_depth_of_the_search_return_valid_programs ... ok
+
+test result: ok. 120 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 13.39s
+
+     Running unittests src/main.rs (/tmp/ga-phase0/head-target/release/deps/ota_gen-b671e9fa02dfa528)
+
+running 4 tests
+test tests::a_permission_failure_leaves_the_existing_output_and_no_temporary_file ... ok
+test tests::a_permission_failure_for_a_new_output_creates_nothing ... ok
+test tests::the_mode_is_set_before_the_first_payload_byte_and_replaces_the_old_mode ... ok
+test tests::a_symbolic_link_output_is_replaced_by_a_private_file_and_its_target_keeps_its_mode ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/bench.rs (/tmp/ga-phase0/head-target/release/deps/bench-bc3127692df53dfd)
+
+running 4 tests
+test compressor_setup_per_chunk ... ignored
+test first_use_of_each_stage_includes_the_driver_compiling_it ... ignored
+test per_stage_times_of_one_generation ... ignored
+test workload_matrix ... ignored
+
+test result: ok. 0 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli.rs (/tmp/ga-phase0/head-target/release/deps/cli-35d98ae91d03ff83)
+
+running 13 tests
+test full_mode_takes_exactly_three_positional_arguments ... ok
+test help_and_version_succeed_without_files ... ok
+test full_mode_refuses_each_search_only_option_and_writes_nothing ... ok
+test explicit_resource_caps_reject_full_generation_without_writing ... ok
+test missing_arguments_unknown_flags_and_removed_profiles_are_usage_errors ... ok
+test runtime_file_key_and_output_errors_exit_one_without_usage ... ok
+test full_mode_takes_a_block_size_a_name_and_explicit_limits ... ok
+test full_mode_writes_a_payload_that_the_client_verifies ... ok
+test malformed_and_out_of_range_numbers_are_usage_errors_before_io ... ok
+test zero_operation_cap_allows_noops_and_zero_search_options_are_valid ... ok
+test full_mode_alternating_bytes_at_block_size_one_fit_a_192_mib_address_space ... ok
+test options_can_be_interleaved_with_files_and_double_dash_ends_option_parsing ... ok
+test the_delta_form_is_unchanged_and_still_searches ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s
+
+     Running tests/full.rs (/tmp/ga-phase0/head-target/release/deps/full-b6ed9ff4eba23606)
+
+running 30 tests
+test a_per_operation_extent_limit_below_one_refuses_both_forms ... ok
+test bad_inputs_are_refused_before_any_image_is_built ... ok
+test a_copy_is_refused_by_the_full_image_rules_though_the_client_accepts_it ... ok
+test a_crafted_full_payload_that_covers_the_image_is_accepted ... ok
+test a_gap_is_refused_even_when_a_replay_from_zeros_would_match ... ok
+test a_small_raw_image_round_trips_under_a_large_block_size ... ok
+test a_new_image_of_another_length_or_content_is_refused ... ok
+test a_sparse_operation_is_refused_though_the_client_accepts_it ... ok
+test a_new_partition_record_that_is_missing_is_refused ... ok
+test a_payload_that_records_an_old_partition_is_not_a_full_image ... ok
+test a_profile_that_admits_no_candidate_is_a_resource_error_and_never_a_switch ... ok
+test alternating_bytes_at_block_size_one_fall_back_to_one_raw_replacement ... ok
+test a_framed_run_shorter_than_one_chunk_round_trips ... ok
+test a_mixed_image_uses_zero_runs_and_frames_together ... ok
+test an_all_zero_image_is_one_zero_operation ... ok
+test metadata_describes_the_new_image_and_nothing_else ... ok
+test blobs_that_do_not_produce_the_image_are_refused_by_the_replay ... ok
+test out_of_order_writes_are_refused_because_full_payloads_write_in_order ... ok
+test an_empty_image_is_a_valid_empty_full_payload ... ok
+test a_compressible_image_is_framed_and_smaller_than_its_raw_form ... ok
+test an_overlap_is_refused ... ok
+test frame_tables_are_split_at_the_profile_limit ... ok
+test a_framed_form_the_profile_cannot_hold_falls_back_to_raw ... ok
+test an_incompressible_image_is_written_as_one_raw_replacement ... ok
+test operation_and_extent_limits_alone_decide_between_the_framed_and_raw_forms ... ok
+test the_same_image_gives_the_same_bytes ... ok
+test the_signature_slots_follow_the_key_size ... ok
+test partial_final_chunks_round_trip_at_every_offset_of_a_chunk ... ok
+test every_image_shape_is_covered_once_in_order_and_checked ... ok
+test a_sixteen_mib_image_fits_the_embedded_profile ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.80s
+
+     Running tests/gpu_eval.rs (/tmp/ga-phase0/head-target/release/deps/gpu_eval-317b7544717985d5)
+
+running 19 tests
+test a_target_copy_across_a_fragmented_target_agrees_with_the_cpu ... ok
+test a_target_copy_reads_unknown_growth_only_after_it_is_written ... ok
+test each_workspace_capacity_refuses_with_its_own_reason ... ok
+test the_device_sizes_simple_programs_exactly_like_the_manifest_encoder ... ok
+test a_repair_the_profile_cannot_hold_is_refused_for_that_reason ... ok
+test a_total_length_past_the_sum_limit_is_refused_as_an_overflow ... ok
+test the_decode_memory_budget_of_the_embedded_profile_is_modeled_on_the_device ... ok
+test the_embedded_profile_refuses_the_same_programs_on_both_sides ... ok
+test a_mismatch_that_crosses_scan_ranges_is_one_span_with_the_right_ends ... ok
+test sizes_agree_at_every_varint_boundary ... ok
+test a_program_with_no_extents_is_admitted_exactly_at_its_charge_on_the_device ... ok
+test random_programs_agree_with_the_cpu_replay_on_a_changed_image ... ok
+test a_search_under_a_budget_that_binds_on_the_workspace_keeps_only_programs_the_cpu_admits ... ok
+test random_programs_agree_on_repetitive_images_where_many_sources_match ... ok
+test random_programs_agree_when_the_image_grows_or_shrinks ... ok
+test the_contract_workspace_is_charged_on_the_device_one_byte_either_side_of_the_decoded_limit ... ok
+test random_programs_agree_on_odd_lengths_and_empty_images ... ok
+test random_programs_agree_on_an_image_of_many_scan_ranges ... ok
+test operations_with_many_ascending_extents_replay_like_the_cpu_model ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.46s
+
+     Running tests/gpu_search.rs (/tmp/ga-phase0/head-target/release/deps/gpu_search-a544e124a64f78a1)
+
+running 22 tests
+test an_image_the_search_cannot_address_is_refused_with_the_limit_that_failed ... ok
+test images_that_exceed_the_devices_storage_buffer_range_are_refused_not_streamed ... ok
+test a_zero_generation_cap_still_seeds_and_evaluates_a_population ... ok
+test a_copy_shift_moves_a_copy_to_another_place_that_holds_the_same_bytes ... ok
+test a_general_copy_shorter_than_a_probe_is_reachable_and_exact ... ok
+test a_guided_copy_is_found_at_an_odd_offset_and_is_exact ... ok
+test the_search_counts_what_it_refuses_and_still_returns_valid_programs ... ok
+test an_immigrant_is_a_random_cover_of_the_image_with_valid_extents ... ok
+test crossover_joins_a_prefix_of_one_parent_and_a_suffix_of_another ... ok
+test compaction_never_moves_a_copy_ahead_of_an_earlier_write_to_the_same_bytes ... ok
+test a_zero_scan_finds_zero_bytes_inside_a_changed_cell ... ok
+test compaction_moves_a_copy_that_lies_between_the_extents_of_an_earlier_write ... ok
+test a_target_copy_proposal_copies_the_new_image_from_elsewhere_and_never_overlaps ... ok
+test a_guided_copy_never_uses_a_hash_collision ... ok
+test every_finalist_is_a_complete_program_whose_raw_size_the_cpu_confirms ... ok
+test a_repetitive_image_with_many_equal_sources_still_searches_and_every_finalist_is_valid ... ok
+test no_target_copy_is_proposed_when_the_target_is_not_readable ... ok
+test the_software_and_the_hardware_device_run_the_same_search ... ok
+test a_seed_and_a_generation_cap_reproduce_the_same_search ... ok
+test splitting_a_run_into_batches_does_not_change_its_result ... ok
+test the_images_go_up_once_and_only_small_records_come_back_while_the_search_runs ... ok
+test the_structural_moves_do_what_they_are_for ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.97s
+
+     Running tests/output.rs (/tmp/ga-phase0/head-target/release/deps/output-bc327a1259bdd0ae)
+
+running 6 tests
+test an_output_that_is_the_new_image_is_refused_and_the_image_is_untouched ... ok
+test a_failed_write_is_reported_and_leaves_no_temporary_file ... ok
+test a_symlink_or_hard_link_to_the_key_is_refused_and_the_key_is_untouched ... ok
+test a_new_output_in_a_directory_with_a_default_group_acl_grants_that_group_nothing ... ok
+test an_output_takes_its_group_from_the_directory_and_not_from_the_file_it_replaces ... ok
+test new_and_replaced_outputs_are_private_and_leave_no_temporary_file ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/regressions.rs (/tmp/ga-phase0/head-target/release/deps/regressions-c0ea0108ddf68d65)
+
+running 20 tests
+test a_zero_budget_does_not_compare_identical_images_to_find_them_unchanged ... ok
+test a_profile_without_signature_slots_is_refused_before_search ... ok
+test a_signing_key_the_profile_cannot_admit_is_refused_before_search ... ok
+test a_sparse_operation_that_keeps_every_chunk_is_admitted ... ok
+test a_frame_cache_never_serves_another_images_bytes ... ok
+test a_payload_inside_its_images_is_accepted_without_recorded_sizes ... ok
+test the_checker_refuses_unwritten_growth_without_recorded_sizes ... ok
+test the_checker_refuses_a_partition_size_that_differs_from_the_images ... ok
+test the_checker_refuses_an_old_image_that_does_not_match_the_manifest ... ok
+test the_checker_refuses_a_source_copy_beyond_an_old_image_whose_size_is_not_recorded ... ok
+test the_checker_refuses_a_target_copy_beyond_the_target_whose_size_is_not_recorded ... ok
+test the_checker_refuses_a_zero_beyond_an_image_whose_size_is_not_recorded ... ok
+test the_checker_refuses_a_kept_sparse_range_beyond_an_image_whose_size_is_not_recorded ... ok
+test a_zero_budget_does_not_scan_for_the_one_byte_repair ... ok
+test a_zero_budget_returns_the_raw_seed_with_a_bounded_number_of_clock_reads ... ok
+test a_profile_that_admits_zero_but_not_raw_replacement_still_builds ... ok
+test a_one_byte_update_builds_under_a_profile_that_refuses_the_raw_replacement ... ok
+test a_deadline_inside_the_search_returns_only_programs_the_profile_admits ... ok
+test a_profile_with_no_admissible_candidate_says_so_within_the_budget ... ok
+test a_copy_of_63_byte_segments_is_reachable_by_the_search ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.29s
+
+     Running tests/search.rs (/tmp/ga-phase0/head-target/release/deps/search-f8c9eeccef02176f)
+
+running 11 tests
+test the_clock_bounds_the_search_time ... ok
+test an_odd_length_image_with_a_partial_final_chunk_builds ... ok
+test stagnation_ends_the_search_before_the_clock_does ... ok
+test the_forced_software_device_builds_a_payload_that_verifies ... ok
+test the_automatic_device_builds_a_payload_that_verifies ... ok
+test a_seed_and_a_generation_cap_reproduce_the_same_bytes ... ok
+test one_byte_images_and_images_shorter_than_a_chunk_build ... ok
+test a_relocated_region_is_found_as_a_copy_and_shrinks_the_payload ... ok
+test a_fixed_generation_search_reproduces_its_recorded_payload ... ok
+test the_search_reports_its_raw_score_apart_from_the_size_of_the_payload_it_builds ... ok
+test one_byte_chunks_build_and_pass_the_checks ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.44s
+
+     Running tests/sizes.rs (/tmp/ga-phase0/head-target/release/deps/sizes-13cc846cdb20baf4)
+
+running 4 tests
+test mapping_source_copy_bounds_are_independent_from_new_image_bounds ... ok
+test mapping_requires_writes_for_growth_even_when_the_new_bytes_are_zero ... ok
+test gpu_classification_uses_the_new_grid_and_never_keeps_growth ... ok
+test generated_payloads_grow_and_shrink_including_empty_images ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+     Running unittests src/lib.rs (/tmp/ga-phase0/head-target/release/deps/delta_update_payload-b97ffad6315c54a9)
+
+running 124 tests
+test encoding::tests::non_canonical_truncated_and_overlong_varints_are_refused ... ok
+test encoding::tests::frame_table_must_have_one_entry_per_chunk_and_stored_lengths_below_their_chunk ... ok
+test encoding::tests::rejects_a_non_zlib_header ... ok
+test encoding::tests::rejects_output_longer_or_shorter_than_one_block ... ok
+test encoding::tests::rejects_a_bad_checksum ... ok
+test encoding::tests::varints_round_trip_at_every_length_boundary ... ok
+test encoding::tests::rejects_a_preset_dictionary ... ok
+test encoding::tests::rejects_truncated_and_trailing_bytes ... ok
+test manifest::tests::decodes_a_well_formed_manifest ... ok
+test manifest::tests::operation_count_is_bounded_before_prost_allocates ... ok
+test manifest::tests::hashes_must_be_empty_or_exactly_sha256_length ... ok
+test plan::tests::a_one_byte_gap_between_extents_is_base_dependent ... ok
+test manifest::tests::missing_operation_type_is_rejected_and_explicit_zero_is_replace ... ok
+test plan::tests::a_partial_last_chunk_must_still_be_covered ... ok
+test plan::tests::a_gap_in_the_prefix_is_base_dependent ... ok
+test plan::tests::a_frame_table_is_refused_on_operations_that_do_not_use_one ... ok
+test plan::tests::a_payload_without_a_signed_size_is_base_dependent ... ok
+test plan::tests::an_empty_program_covers_only_an_empty_image ... ok
+test plan::tests::an_old_size_alone_does_not_bound_the_target ... ok
+test plan::tests::an_extent_must_state_both_fields_in_either_list ... ok
+test plan::tests::block_size_is_the_codec_chunk_and_is_bounded ... ok
+test plan::tests::an_in_target_copy_is_base_dependent_even_over_full_coverage ... ok
+test plan::tests::copy_source_must_lie_inside_the_recorded_partition ... ok
+test plan::tests::extent_arithmetic_overflow_is_an_error_not_a_panic ... ok
+test plan::tests::a_source_copy_covering_the_prefix_is_destination_independent ... ok
+test plan::tests::frame_table_must_describe_exactly_the_blob_and_each_chunk ... ok
+test plan::tests::a_sparse_operation_that_keeps_a_chunk_leaves_it_to_the_destination ... ok
+test plan::tests::frames_accept_a_table_over_full_and_partial_chunks ... ok
+test plan::tests::frames_need_a_data_hash ... ok
+test plan::tests::in_target_copy_checks_the_whole_range_sets ... ok
+test plan::tests::in_target_copy_is_accepted_and_needs_a_readable_target ... ok
+test plan::tests::in_target_copy_refuses_a_source_that_intersects_its_destination ... ok
+test plan::tests::a_sparse_operation_with_no_kept_chunk_covers_its_prefix ... ok
+test plan::tests::in_target_copy_source_counts_toward_the_device_bound ... ok
+test plan::tests::later_operations_may_rewrite_an_earlier_source ... ok
+test plan::tests::accepts_byte_ranges_out_of_order_and_overlapping_and_reports_the_geometry ... ok
+test plan::tests::only_known_operation_types_are_accepted ... ok
+test plan::tests::operations_at_their_packed_limits_pass_and_one_byte_more_is_refused ... ok
+test encoding::tests::round_trips_compressible_and_incompressible_blocks_without_expanding_noise ... ok
+test plan::tests::replace_and_zero_covering_the_prefix_are_destination_independent ... ok
+test plan::tests::overlapping_extents_within_one_operation_cover_their_union ... ok
+test plan::tests::adjacent_extents_across_and_within_operations_leave_no_gap ... ok
+test plan::tests::replace_requires_exact_length_and_a_data_hash ... ok
+test plan::tests::blobs_must_be_contiguous_and_match_the_signature_offset ... ok
+test plan::tests::copies_need_equal_byte_counts_a_source_hash_and_no_blob ... ok
+test plan::tests::source_copy_accepts_a_source_and_marks_the_plan_as_needing_one ... ok
+test plan::tests::revision_must_be_the_byte_range_revision ... ok
+test plan::tests::an_explicit_zero_start_is_a_present_start ... ok
+test plan::tests::source_data_is_refused_on_replace_and_zero ... ok
+test plan::tests::sparse_accepts_a_map_over_partial_and_full_chunks ... ok
+test plan::tests::coverage_may_arrive_out_of_order_and_overlap ... ok
+test plan::tests::an_extent_heavy_program_is_classified_by_the_union_of_all_its_extents ... ok
+test plan::tests::sparse_map_must_have_the_canonical_length_and_clear_unused_bits ... ok
+test plan::tests::copies_use_their_own_source_geometry_and_destinations_use_only_new_size ... ok
+test plan::tests::partition_sizes_are_independent_and_need_not_be_block_aligned ... ok
+test plan::tests::every_range_bounds_the_partition_not_only_the_last_one ... ok
+test plan::tests::range_intersection_handles_boundaries_ordering_and_overlapping_lists ... ok
+test plan::tests::sparse_table_must_have_one_entry_per_zlib_chunk_and_no_more ... ok
+test plan::tests::sparse_with_an_empty_blob_needs_the_empty_digest ... ok
+test plan::tests::the_extent_heavy_copy_is_checked_across_the_whole_lists ... ok
+test plan::tests::zero_hash_is_absent_empty_or_the_empty_blob_digest ... ok
+test plan::tests::zero_length_and_empty_extent_lists_are_refused ... ok
+test plan::tests::zero_requires_empty_data ... ok
+test prescan::tests::accounting_charges_every_buffer_and_its_overhead ... ok
+test prescan::tests::an_extent_must_state_both_fields_and_a_written_zero_start_is_present ... ok
+test prescan::tests::byte_fields_are_charged_at_their_minimum_capacity ... ok
+test prescan::tests::duplicate_hashes_are_refused ... ok
+test prescan::tests::duplicate_strings_are_refused ... ok
+test prescan::tests::count_limits_are_not_all_admissible_together ... ok
+test prescan::tests::duplicate_signature_data_is_refused_at_every_replacement_size ... ok
+test prescan::tests::duplicate_submessages_are_refused ... ok
+test prescan::tests::extent_fields_are_shape_checked_and_not_summed ... ok
+test prescan::tests::extents_per_operation_and_in_total_are_bounded ... ok
+test prescan::tests::frame_table_is_bounded_and_a_repeat_is_refused ... ok
+test prescan::tests::growth_is_a_transient_only_above_the_minimum_capacity ... ok
+test prescan::tests::hashes_must_be_empty_or_exactly_sha256_length ... ok
+test prescan::tests::only_the_largest_transient_is_charged ... ok
+test prescan::tests::missing_operation_type_is_rejected_and_explicit_zero_is_accepted ... ok
+test prescan::tests::operation_count_over_the_profile_is_a_resource_limit ... ok
+test prescan::tests::reported_signature_data_sequence_is_refused_in_prescan ... ok
+test prescan::tests::signature_entries_and_data_are_bounded ... ok
+test prescan::tests::signature_message_size_is_bounded_before_scanning ... ok
+test prescan::tests::protobuf_field_order_does_not_change_the_verdict ... ok
+test prescan::tests::unknown_scalar_fields_are_skipped ... ok
+test prescan::tests::the_contract_workspace_is_a_transient_that_counts_against_the_budget ... ok
+test prescan::tests::accounted_is_monotone_in_every_count ... ok
+test prescan::tests::repeated_and_unknown_fields_remain_accepted ... ok
+test prescan::tests::unsupported_structures_are_rejected_not_ignored ... ok
+test prescan::tests::vec_slots_follow_push_growth_at_each_boundary ... ok
+test rsa::tests::parses_both_public_key_formats ... ok
+test rsa::tests::rejects_malformed_and_wrong_kind_pem ... ok
+test sha256::tests::empty_updates_leave_hash_unchanged ... ok
+test sha256::tests::chunking_preserves_digest_at_block_and_padding_boundaries ... ok
+test sha256::tests::matches_golden_reference ... ok
+test rsa::tests::rejects_unsupported_key_sizes ... ok
+test prescan::tests::oversized_encoded_manifest_is_refused_before_scanning ... ok
+test prescan::tests::malformed_wire_is_rejected_before_decoding ... ok
+test rsa::tests::rejects_wrong_digest_lengths ... ok
+test sha256::tests::matches_known_answer_vectors ... ok
+test prescan::tests::packed_field_is_bounded_by_its_combined_limit ... ok
+test sha256::tests::snapshot_is_bounded_and_versioned ... ok
+test sha256::tests::snapshot_restores_to_the_same_digest_at_every_split_point ... ok
+test sign::tests::matches_reference_wire_format ... ok
+test sign::tests::rejects_invalid_lengths_before_allocating ... ok
+test plan::tests::the_sweep_agrees_with_the_pairwise_definition_on_generated_lists ... ok
+test rsa::tests::parses_both_private_key_formats ... ok
+test sign::tests::size_helpers_match_known_wire_sizes_and_generated_encodings ... ok
+test sign::tests::encoded_openssl_signature_verifies_after_unpadding ... ok
+test sha256::tests::matches_million_a_vector ... ok
+test rsa::tests::rejects_tampering_wrong_keys_and_bad_signature_lengths ... ok
+test verify::tests::rejects_empty_and_malformed_signature_messages ... ok
+test verify::tests::oversized_payload_signature_declaration_is_refused_after_authentication ... ok
+test verify::tests::signature_messages_are_bounded_at_the_shared_boundary ... ok
+test rsa::tests::rejects_signatures_without_sha256_digest_info ... ok
+test verify::tests::duplicate_signature_data_is_refused_before_any_entry_is_checked ... ok
+test verify::tests::skips_well_formed_unknown_fields ... ok
+test encoding::tests::garbage_never_panics_and_never_decodes_to_the_wrong_block ... ok
+test verify::tests::rejects_signature_offset_and_size_overflow_without_panicking ... ok
+test verify::tests::accepts_multiple_signatures_optional_size_and_nonzero_padding ... ok
+test verify::tests::rejects_tampering_in_each_authenticated_region ... ok
+test rsa::tests::matches_openssl_sha256_signatures_for_both_key_sizes ... ok
+test verify::tests::rejects_missing_signatures_incomplete_fields_and_trailing_bytes ... ok
+test verify::tests::supports_key_rotation_and_an_empty_blob_region ... ok
+test verify::tests::decodes_generated_manifest_and_info ... ok
+
+test result: ok. 124 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+   Doc-tests delta_update_cli
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests delta_update_cli_args
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests delta_update_client
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests delta_update_generator
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests delta_update_payload
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

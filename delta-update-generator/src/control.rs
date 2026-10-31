@@ -88,6 +88,7 @@ pub struct Progress {
     window: f64,
     min_gain: u64,
     history: Vec<(f64, u64)>,
+    epoch: Option<(f64, u64)>,
 }
 
 impl Progress {
@@ -97,6 +98,7 @@ impl Progress {
             window: window,
             min_gain: min_gain,
             history: Vec::new(),
+            epoch: None,
         };
     }
 
@@ -133,9 +135,13 @@ impl Progress {
         if self.min_gain == 0 || now < self.window {
             return false;
         }
-        let base = match self.best_at(now - self.window) {
-            None => return false,
-            Some(size) => size,
+        let window_start = now - self.window;
+        let base = match self.epoch {
+            Some((at, size)) if window_start < at => size,
+            _ => match self.best_at(window_start) {
+                None => return false,
+                Some(size) => size,
+            },
         };
         return base.saturating_sub(best) < self.min_gain;
     }
@@ -193,6 +199,11 @@ impl<'a> Control<'a> {
     pub fn record(&mut self, size: u64) {
         let now = self.now();
         self.progress.record(now, size);
+    }
+
+    /// Reset the stagnation window after a population restart, without erasing improvement history.
+    pub fn reset_stagnation(&mut self, best: u64) {
+        self.progress.epoch = Some((self.now(), best));
     }
 
     /// Whether the stagnation rule stops the search now, with `best` as its best size.

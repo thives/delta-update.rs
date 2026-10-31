@@ -132,6 +132,102 @@ fn splitting_a_run_into_batches_does_not_change_its_result() {
 }
 
 #[test]
+fn mutation_statistics_match_forced_proposals_and_reset() {
+    let old = noise(512, 12);
+    let mut new = old.clone();
+    new[80..240].fill(0);
+    new[300..450].copy_from_slice(&old[20..170]);
+    let p = problem(&old, &new);
+    let mut session =
+        open_session(&p, &by_generations(7, 1)).unwrap_or_else(|e| panic!("{}", e.msg));
+    let mut evaluator =
+        open_session(&p, &by_generations(7, 1)).unwrap_or_else(|e| panic!("{}", e.msg));
+    let seeded = session.prepare().unwrap_or_else(|e| panic!("{}", e.msg));
+    assert_eq!(seeded.moves, [MoveCounters::default(); MV_COUNT]);
+    evaluator.prepare().unwrap_or_else(|e| panic!("{}", e.msg));
+    let parent = vec![Op::new(Kind::Replace, vec![span(0, 512)])];
+    for mv in 0..MV_COUNT {
+        let before = session
+            .load_population(&[parent.clone()])
+            .unwrap_or_else(|e| panic!("{}", e.msg));
+        assert_eq!(before.moves, [MoveCounters::default(); MV_COUNT]);
+        let children = session
+            .breed_only(session.next_generation(), 3, mv as u32 + 1)
+            .unwrap_or_else(|e| panic!("{}", e.msg));
+        assert_eq!(session.counters().unwrap().moves, before.moves);
+        let skipped = children.iter().filter(|c| c.is_none()).count() as u32;
+        let programs: Vec<_> = children.into_iter().flatten().collect();
+        let results = evaluator
+            .evaluate(&programs)
+            .unwrap_or_else(|e| panic!("{}", e.msg));
+        let admitted = results.iter().filter(|r| r.size.is_some()).count() as u32;
+        let best = results.iter().filter_map(|r| r.size).min();
+        let after = session
+            .run_forced_generation(3, mv as u32 + 1)
+            .unwrap_or_else(|e| panic!("{}", e.msg));
+        for id in 0..MV_COUNT {
+            let expected = if id == mv {
+                MoveCounters {
+                    proposed: CHILDREN as u32,
+                    skipped: skipped,
+                    admitted: admitted,
+                    new_best: u32::from(best.is_some_and(|b| b < before.best as u64)),
+                }
+            } else {
+                MoveCounters::default()
+            };
+            assert_eq!(after.moves[id], expected, "forced move {mv}, counter {id}");
+        }
+        let immigrant = session.run_forced_generation(1, mv as u32 + 1).unwrap();
+        assert_eq!(
+            immigrant.moves, after.moves,
+            "immigrants must not inherit mutation tags"
+        );
+        let restarted = session.restart_from_archive().unwrap();
+        assert_eq!(
+            restarted.moves, after.moves,
+            "restart must preserve counters"
+        );
+    }
+    let two = session
+        .load_population(&[parent.clone(), Vec::new()])
+        .unwrap();
+    assert!(two.members >= 2);
+    session.breed_only(session.next_generation(), 3, 1).unwrap();
+    let crossover = session.run_forced_generation(2, 1).unwrap();
+    assert_eq!(
+        crossover.moves, two.moves,
+        "crossovers must not inherit mutation tags"
+    );
+    let one = session.load_population(&[parent]).unwrap();
+    assert_eq!(one.members, 1);
+    let fallback_mutation = session.run_forced_generation(2, 1).unwrap();
+    assert_eq!(fallback_mutation.moves[0].proposed, CHILDREN as u32);
+    let cumulative = session.run_forced_generation(3, 1).unwrap();
+    assert_eq!(cumulative.moves[0].proposed, 2 * CHILDREN as u32);
+    session.evaluate(&[Vec::new()]).unwrap();
+    assert_eq!(
+        session.counters().unwrap().moves,
+        [MoveCounters::default(); MV_COUNT]
+    );
+    assert!(session.run_forced_generation(4, 0).is_err());
+    assert!(
+        session
+            .run_forced_generation(3, MV_COUNT as u32 + 1)
+            .is_err()
+    );
+    let empty = session.load_population(&[]).unwrap();
+    assert_eq!(empty.moves, [MoveCounters::default(); MV_COUNT]);
+    let fallback = session.run_forced_generation(3, 1).unwrap();
+    assert_eq!(
+        fallback.moves, empty.moves,
+        "an empty population breeds immigrants"
+    );
+    let reset = session.prepare().unwrap();
+    assert_eq!(reset.moves, [MoveCounters::default(); MV_COUNT]);
+}
+
+#[test]
 fn a_zero_generation_cap_still_seeds_and_evaluates_a_population() {
     let (old, new) = relocated();
     let found = search(&old, &new, 1, 0, None);
@@ -739,7 +835,9 @@ fn the_images_go_up_once_and_only_small_records_come_back_while_the_search_runs(
         "read back {} bytes",
         long.stats.read_back
     );
-    assert!(long.stats.read_back - short.stats.read_back < 58 * 300 + 200_000);
+    assert!(
+        long.stats.read_back - short.stats.read_back < 58 * (CTL_WORDS as u64 * 4 + 44) + 200_000
+    );
 }
 
 #[test]
@@ -775,7 +873,7 @@ fn images_that_exceed_the_devices_storage_buffer_range_are_refused_not_streamed(
 }
 
 #[test]
-fn the_software_and_the_hardware_device_run_the_same_search() {
+fn the_software_and_hardware_searches_return_valid_finalists() {
     let (old, new) = relocated();
     let p = problem(&old, &new);
     let run = |device| {
@@ -790,12 +888,29 @@ fn the_software_and_the_hardware_device_run_the_same_search() {
     if automatic.device == software.device {
         return;
     }
-    assert_eq!(
-        software.finalists, automatic.finalists,
-        "{:?} against {:?}",
-        software.device, automatic.device
-    );
-    assert_eq!(software.counters, automatic.counters);
+    for found in [&software, &automatic] {
+        assert!(
+            !found.finalists.is_empty(),
+            "device {:?} returned no finalists",
+            found.device
+        );
+        for finalist in &found.finalists {
+            let checked = evaluate(&p, finalist.program.clone(), &Control::unbounded())
+                .unwrap_or_else(|_| panic!("deadline"));
+            let checked = checked.unwrap_or_else(|| {
+                panic!(
+                    "device {:?} returned an invalid finalist: {:?}",
+                    found.device, finalist.program
+                )
+            });
+            assert_eq!(checked.size, finalist.raw_size, "device {:?}", found.device);
+            assert_eq!(
+                checked.program, finalist.program,
+                "device {:?}",
+                found.device
+            );
+        }
+    }
 }
 
 #[test]

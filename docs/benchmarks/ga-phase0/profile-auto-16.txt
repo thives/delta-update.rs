@@ -1,0 +1,22 @@
+    Finished `release` profile [optimized] target(s) in 0.04s
+     Running tests/bench.rs (/tmp/ga-phase0/head-target/release/deps/bench-bc3127692df53dfd)
+
+running 1 test
+device Intel(R) Iris(R) Xe Graphics (ADL GT2)
+images 16777216 + 16777216 bytes
+open and upload 0.057 s, tables + first population 0.257 s
+after seeding: best raw 2440455 members 8 refused [0, 0, 35, 0, 0, 48, 0, 0, 0, 0, 0, 0]
+  breed    mean    44.68 ms  worst   106.55 ms
+  replay   mean    27.57 ms  worst   114.29 ms
+  count    mean    61.53 ms  worst   106.15 ms
+  prefix   mean     1.20 ms  worst     4.90 ms
+  emit     mean     8.55 ms  worst    18.99 ms
+  finish   mean    17.47 ms  worst    25.65 ms
+  select   mean     4.43 ms  worst     8.37 ms
+20 generations in 3.501 s: 5.7 generations/s, 548 candidates/s; best raw 1196128
+population (raw size, operations, extents): [(1196128, 105, 556), (1196637, 107, 596), (1197416, 101, 567), (1197805, 105, 558), (1198942, 105, 786), (1199266, 103, 556), (1199887, 103, 583), (1201156, 103, 554), (1201156, 103, 554), (1201156, 103, 554), (1201176, 104, 555), (1201219, 104, 556), (1201475, 105, 553), (1201668, 103, 554), (1202261, 104, 558), (1204769, 107, 556), (1205957, 103, 567), (1206199, 103, 567), (1206239, 103, 555), (1206293, 104, 556), (1206342, 105, 557), (1206354, 105, 558), (1206356, 105, 558), (1206460, 107, 556)]
+device memory 177887704 bytes, host memory 20971520 bytes, uploaded 33554688 bytes, read back 161760 bytes
+test per_stage_times_of_one_generation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 5.82s
+

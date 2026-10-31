@@ -16,7 +16,7 @@ uint members;
 uint tournament() {
     uint best = below(members);
     uint best_fit = st[slot_base(st[ST_POP + best]) + H_FIT];
-    for (uint k = 1u; k < uint(TOURNAMENT); k++) {
+    for (uint k = 1u; k < P(P_TOURNAMENT); k++) {
         uint other = below(members);
         uint fit = st[slot_base(st[ST_POP + other]) + H_FIT];
         if (fit < best_fit) {
@@ -44,20 +44,24 @@ void main() {
     // The search leaves both zero, and the tests use them to reach one operator at a time.
     uint how = pc.a1;
     bool made;
-    if (members == 0u || how == 1u || (how == 0u && pct(IMMIGRANT_PERCENT))) {
+    uint move_tag = 0u;
+    if (members == 0u || how == 1u || (how == 0u && pct(P(P_IMMIGRANT_PERCENT)))) {
         make_immigrant(chd);
         made = true;
-    } else if (members >= 2u && (how == 2u || (how == 0u && pct(CROSSOVER_PERCENT)))) {
+    } else if (members >= 2u && (how == 2u || (how == 0u && pct(P(P_CROSSOVER_PERCENT))))) {
         uint a = tournament();
         uint b = tournament();
         made = mv_crossover(a, b, chd);
     } else {
         uint par = tournament();
         uint mv = pc.a0 != 0u ? pc.a0 - 1u : pick_move();
+        move_tag = mv < uint(MV_COUNT) ? mv + 1u : 0u;
         made = apply_move(mv, par, chd, scr0, scr1);
     }
     if (!made) {
         p_clear(chd);
     }
+    // Moves may copy the parent's header, and failed proposals clear the child.
+    st[chd + H_MOVE] = move_tag;
     ctl_add(C_BRED, 1u);
 }

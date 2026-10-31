@@ -136,6 +136,188 @@ fn per_stage_times_of_one_generation() {
     );
 }
 
+fn dead_data_bytes(program: &[delta_update_generator::program::Op]) -> (u64, u64) {
+    let mut data = 0u64;
+    let mut dead = 0u64;
+    for (index, op) in program.iter().enumerate() {
+        if !op.kind.carries_data() {
+            continue;
+        }
+        for span in &op.dst {
+            data += span.len;
+            let mut overlaps: Vec<(u64, u64)> = program[index + 1..]
+                .iter()
+                .flat_map(|later| later.dst.iter())
+                .filter_map(|later| {
+                    let start = span.start.max(later.start);
+                    let end = span.end().min(later.end());
+                    (start < end).then_some((start, end))
+                })
+                .collect();
+            overlaps.sort_unstable();
+            let mut covered: u64 = 0;
+            let mut current: Option<(u64, u64)> = None;
+            for (start, end) in overlaps {
+                match current {
+                    Some((a, b)) if start <= b => current = Some((a, b.max(end))),
+                    Some((a, b)) => {
+                        covered += b - a;
+                        current = Some((start, end));
+                    }
+                    None => current = Some((start, end)),
+                }
+            }
+            if let Some((a, b)) = current {
+                covered += b - a;
+            }
+            dead += covered;
+        }
+    }
+    (data, dead)
+}
+
+#[test]
+#[ignore]
+fn mutation_stats() {
+    let (old, new) = images();
+    let (mut session, _) = open(&old, &new);
+    session.prepare().unwrap_or_else(|e| panic!("{}", e.msg));
+    eprintln!(
+        "device {} images {} + {}",
+        session.device_name(),
+        old.len(),
+        new.len()
+    );
+    for batch in [20, 80] {
+        let counters = session
+            .run_generations(batch)
+            .unwrap_or_else(|e| panic!("{}", e.msg));
+        eprintln!("generation {} best {}", counters.generations, counters.best);
+        for (id, stats) in counters.moves.iter().enumerate() {
+            eprintln!(
+                "move {} proposed {} skipped {} admitted {} new_best {}",
+                id, stats.proposed, stats.skipped, stats.admitted, stats.new_best
+            );
+        }
+    }
+}
+
+#[test]
+#[ignore]
+fn operator_yield_and_repair_inheritance() {
+    use delta_update_generator::gpu_layout::CHILDREN;
+
+    let (old, new) = images();
+    let (mut session, _) = open(&old, &new);
+    session.prepare().unwrap_or_else(|e| panic!("{}", e.msg));
+    let warmup: u32 = std::env::var("OTA_BENCH_GENERATIONS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20);
+    session
+        .run_generations(warmup)
+        .unwrap_or_else(|e| panic!("{}", e.msg));
+    let converged = session.population().unwrap_or_else(|e| panic!("{}", e.msg));
+    let parents: Vec<Vec<_>> = converged.iter().map(|f| f.program.clone()).collect();
+    let _ = session
+        .load_population(&parents)
+        .unwrap_or_else(|e| panic!("{}", e.msg));
+    let population = session.population().unwrap_or_else(|e| panic!("{}", e.msg));
+    let worst_kept = population.iter().map(|f| f.raw_size).max().unwrap_or(0);
+    let assessed = session
+        .evaluate(&parents)
+        .unwrap_or_else(|e| panic!("{}", e.msg));
+    let repair_candidates = population
+        .iter()
+        .filter(|member| {
+            member
+                .program
+                .last()
+                .is_some_and(|op| op.kind == delta_update_generator::program::Kind::Replace)
+        })
+        .count();
+    let repaired = assessed.iter().filter(|e| e.mismatch_spans > 0).count();
+    let (data_bytes, dead_bytes) = assessed.iter().fold((0u64, 0u64), |(data, dead), e| {
+        let (member_data, member_dead) = dead_data_bytes(&e.program);
+        (data + member_data, dead + member_dead)
+    });
+    eprintln!(
+        "device {} images {} + {} generations {}",
+        session.device_name(),
+        old.len(),
+        new.len(),
+        warmup
+    );
+    eprintln!(
+        "reloaded population {} worst_kept {} trailing_replace_repair_candidates {} newly_repaired_on_evaluation {} dead_raw_data_bytes {}/{} ({:.3})",
+        population.len(),
+        worst_kept,
+        repair_candidates,
+        repaired,
+        dead_bytes,
+        data_bytes,
+        dead_bytes as f64 / data_bytes.max(1) as f64
+    );
+
+    for (label, how, mv) in std::iter::once(("immigrant", 1u32, 0u32))
+        .chain(std::iter::once(("crossover", 2u32, 0u32)))
+        .chain((1..=16).map(|mv| ("mutation", 3u32, mv)))
+    {
+        let mut totals = [0u64; 3];
+        let mut refusals = std::collections::BTreeMap::<String, u64>::new();
+        let mut valid = 0u64;
+        let mut improvements = 0u64;
+        for generation in 1..=12 {
+            // evaluate() replaces candidate slots and clears the population control words.
+            let loaded = session
+                .load_population(&parents)
+                .unwrap_or_else(|e| panic!("{}", e.msg));
+            assert!(
+                loaded.members > 0,
+                "forced breeding requires a populated session"
+            );
+            let proposals = session
+                .breed_only(generation, how, mv)
+                .unwrap_or_else(|e| panic!("{}", e.msg));
+            let skipped = proposals.iter().filter(|p| p.is_none()).count() as u64;
+            let programs: Vec<Vec<_>> = proposals.into_iter().flatten().collect();
+            let evaluations = session
+                .evaluate(&programs)
+                .unwrap_or_else(|e| panic!("{}", e.msg));
+            for result in evaluations {
+                if let Some(size) = result.size {
+                    valid += 1;
+                    if size < worst_kept {
+                        improvements += 1;
+                    }
+                } else {
+                    let name = delta_update_generator::gpu_layout::STATUS_NAMES
+                        .get(result.status as usize)
+                        .copied()
+                        .unwrap_or("unknown")
+                        .to_string();
+                    *refusals.entry(name).or_default() += 1;
+                }
+            }
+            totals[0] += CHILDREN as u64;
+            totals[1] += skipped;
+            totals[2] += programs.len() as u64;
+        }
+        eprintln!(
+            "operator {} mv {} proposed {} skipped {} evaluated {} valid {} refusals {:?} beat_worst {} ({:.3})",
+            label,
+            mv,
+            totals[0],
+            totals[1],
+            totals[2],
+            valid,
+            refusals,
+            improvements,
+            improvements as f64 / valid.max(1) as f64
+        );
+    }
+}
+
 #[test]
 #[ignore]
 fn first_use_of_each_stage_includes_the_driver_compiling_it() {

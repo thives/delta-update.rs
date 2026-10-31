@@ -187,7 +187,7 @@ fn the_clock_bounds_the_search_time() {
 }
 
 #[test]
-fn stagnation_ends_the_search_before_the_clock_does() {
+fn stagnation_restarts_the_population_before_ending_the_search() {
     let old = noise(2048, 12);
     let mut new = old.clone();
     new[100..140].fill(1);
@@ -201,11 +201,11 @@ fn stagnation_ends_the_search_before_the_clock_does() {
         device: support::device(),
         readable_target: true,
     };
+    let problem = problem_for(&old, &new, 32);
     let started = Instant::now();
-    let _ = success(build_payload_with(
-        &old, &new, b"A/B", PRIV, 32, &EMBEDDED, &config,
-    ));
+    let found = success(search::run(&problem, &config));
     let took = started.elapsed().as_secs_f64();
+    assert_eq!(found.stop, delta_update_generator::Stop::Stagnation);
     assert!(took < 10.0, "a stagnant search ran for {:.2} s", took);
 }
 
@@ -282,8 +282,8 @@ fn one_byte_chunks_build_and_pass_the_checks() {
     }
 }
 
-const RECORDED_LEN: usize = 2279;
-const RECORDED_DIGEST: [u8; 8] = [0x1b, 0x33, 0x7e, 0x7c, 0x0a, 0x32, 0x96, 0xcb];
+const RECORDED_LEN: usize = 1660;
+const RECORDED_DIGEST: [u8; 8] = [0x40, 0x81, 0xa3, 0x78, 0x78, 0x0c, 0x60, 0xc5];
 
 #[test]
 fn a_fixed_generation_search_reproduces_its_recorded_payload() {

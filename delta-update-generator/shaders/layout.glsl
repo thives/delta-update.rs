@@ -13,7 +13,7 @@
 // are bred, replayed and scored in parallel, so a wider brood costs little more time on a device with
 // many threads.
 #define POP 24
-#define ELITES 3
+#define DEFAULT_ELITES 3
 #define CHILDREN 96
 // Candidates evaluated by one evaluation pass: the seeding generation evaluates this many, and the
 // breeding generations evaluate CHILDREN. NCAND is the larger of CHILDREN and POP.
@@ -60,6 +60,8 @@
 #define H_MISMBYTES 11
 // Runs the replay left in the candidate's workspace.
 #define H_RUNS 12
+// Zero for non-mutations; otherwise the mutation ID plus one.
+#define H_MOVE 13
 
 #define FIT_INVALID 4294967295u
 
@@ -120,7 +122,7 @@
 
 // ---- State buffer --------------------------------------------------------------------------
 #define PARAMS_WORDS 64
-#define CTL_WORDS 64
+#define CTL_WORDS 128
 #define ST_PARAMS 0
 #define ST_CTL PARAMS_WORDS
 #define ST_POP (ST_CTL + CTL_WORDS)
@@ -169,6 +171,10 @@
 #define P_NEW_BASE 31
 #define P_EQ_BITS 32
 #define P_ZERO_BITS 33
+#define P_TOURNAMENT 34
+#define P_IMMIGRANT_PERCENT 35
+#define P_CROSSOVER_PERCENT 36
+#define P_ELITES 37
 
 // Control words, written by the shaders and read by the host between batches.
 #define C_GEN 0
@@ -179,6 +185,13 @@
 #define C_BRED 5
 #define C_SKIPPED 6
 #define C_REJ 16
+// Four saturating counters per mutation ID, updated by the selection thread.
+#define C_MOVE 32
+#define MOVE_STATS 4
+#define MS_PROPOSED 0
+#define MS_SKIPPED 1
+#define MS_ADMITTED 2
+#define MS_NEW_BEST 3
 
 // ---- Index buffer --------------------------------------------------------------------------
 // Sorted tables of {hash, position}, one per image, the per-cell classification, and two bit maps
@@ -194,9 +207,9 @@
 #define IDX_MAX_ENTRIES 4194304
 
 // ---- Breeding ------------------------------------------------------------------------------
-#define TOURNAMENT 3
-#define IMMIGRANT_PERCENT 8
-#define CROSSOVER_PERCENT 12
+#define DEFAULT_TOURNAMENT 3
+#define DEFAULT_IMMIGRANT_PERCENT 8
+#define DEFAULT_CROSSOVER_PERCENT 12
 #define CANDIDATES 32
 #define TARGET_SHARE 30
 #define GUIDED_SHARE 60

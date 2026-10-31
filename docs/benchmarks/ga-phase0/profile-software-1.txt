@@ -1,0 +1,22 @@
+    Finished `release` profile [optimized] target(s) in 0.04s
+     Running tests/bench.rs (/tmp/ga-phase0/head-target/release/deps/bench-bc3127692df53dfd)
+
+running 1 test
+device llvmpipe (LLVM 21.1.8, 256 bits)
+images 1048576 + 1048576 bytes
+open and upload 0.866 s, tables + first population 0.100 s
+after seeding: best raw 253389 members 24 refused [0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  breed    mean     8.92 ms  worst    16.19 ms
+  replay   mean     2.26 ms  worst     9.34 ms
+  count    mean    13.29 ms  worst    19.41 ms
+  prefix   mean     0.28 ms  worst     0.38 ms
+  emit     mean     6.45 ms  worst    16.05 ms
+  finish   mean     0.93 ms  worst     2.07 ms
+  select   mean     0.41 ms  worst     0.67 ms
+20 generations in 0.923 s: 21.7 generations/s, 2081 candidates/s; best raw 77189
+population (raw size, operations, extents): [(77189, 39, 354), (77315, 37, 346), (77732, 41, 342), (77802, 37, 351), (78064, 41, 350), (78155, 39, 352), (78176, 40, 340), (78231, 36, 339), (78288, 41, 361), (78365, 39, 339), (78365, 39, 339), (78365, 39, 339), (78367, 39, 339), (78414, 37, 347), (78418, 40, 340), (78448, 39, 340), (78468, 41, 341), (78500, 40, 341), (78551, 41, 342), (78557, 36, 338), (78559, 41, 343), (78566, 36, 339), (78567, 41, 344), (78601, 37, 338)]
+device memory 126522904 bytes, host memory 5242888 bytes, uploaded 2097408 bytes, read back 87072 bytes
+test per_stage_times_of_one_generation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 2.29s
+

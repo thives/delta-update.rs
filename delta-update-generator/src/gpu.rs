@@ -946,6 +946,14 @@ pub struct SessionConfig {
     pub max_extents_per_op: u32,
     pub max_total_extents: u32,
     pub model: SizeModel,
+    /// Number of members sampled by each parent tournament.
+    pub tournament: u32,
+    /// Probability, in percent, of breeding an immigrant.
+    pub immigrant_percent: u32,
+    /// Probability, in percent, of breeding by crossover after the immigrant check.
+    pub crossover_percent: u32,
+    /// Number of best population members retained unchanged.
+    pub elites: u32,
 }
 
 /// What a session has done on the device, for measurement.
@@ -1100,6 +1108,16 @@ impl Session {
         config: SessionConfig,
     ) -> Result<Session, PayloadError> {
         let started = Instant::now();
+        if config.tournament == 0
+            || config.immigrant_percent > 100
+            || config.crossover_percent > 100
+            || config.elites as usize > POP
+        {
+            return Err(err(
+                Code::unsupported_field,
+                "invalid GA parameters: tournament must be positive, percentages at most 100, and elites at most POP",
+            ));
+        }
         if old.len() >= MAX_IMAGE || new.len() >= MAX_IMAGE {
             return Err(err(
                 Code::resource_limit,
@@ -1225,6 +1243,10 @@ impl Session {
         p[P_MAX_OPS] = c.max_operations;
         p[P_MAX_EXT_OP] = c.max_extents_per_op;
         p[P_MAX_EXT_TOTAL] = c.max_total_extents;
+        p[P_TOURNAMENT] = c.tournament;
+        p[P_IMMIGRANT_PERCENT] = c.immigrant_percent;
+        p[P_CROSSOVER_PERCENT] = c.crossover_percent;
+        p[P_ELITES] = c.elites;
         p[P_READABLE] = c.readable_target as u32;
         p[P_NEW_BASE] = self.new_base as u32;
         p[P_SIG2] = c.model.signatures;
@@ -1488,8 +1510,9 @@ impl Session {
     /// result carries the program as stored, repair included. This is the differential-testing and
     /// diagnostic entry; the search itself never moves a chromosome across to the host.
     ///
-    /// A program the chromosome cannot hold is refused here with the capacity status, without a
-    /// device round trip.
+    /// This diagnostic replaces candidate slots and clears the control counters, including mutation
+    /// statistics; it is not a continuation of a search session. A program the chromosome cannot
+    /// hold is refused here with the capacity status, without a device round trip.
     pub fn evaluate(&mut self, programs: &[Vec<Op>]) -> Result<Vec<Evaluation>, PayloadError> {
         if programs.len() > NCAND {
             return Err(err(
@@ -1583,6 +1606,43 @@ impl Session {
         return self.counters();
     }
 
+    /// Re-seed the population with the archive and deterministic immigrants after a plateau.
+    /// The archive is retained as the set of elites, while immigrants are generated using the
+    /// current global generation so consecutive restarts do not repeat the same proposals.
+    pub fn restart_from_archive(&mut self) -> Result<Counters, PayloadError> {
+        let previous = self.counters()?;
+        let previous_ctl = self.download(Which::State, ST_CTL, CTL_WORDS)?;
+        let generation = self.next_generation;
+        let archive = self.finalists()?;
+        let proposals = self.breed_only(generation, 1, 0)?;
+        let mut programs: Vec<Vec<Op>> = archive.into_iter().map(|f| f.program).collect();
+        for program in proposals.into_iter().flatten() {
+            if programs.len() >= NCAND {
+                break;
+            }
+            programs.push(program);
+        }
+        let current = self.load_population(&programs)?;
+        self.next_generation = generation;
+
+        let reset_ctl = self.download(Which::State, ST_CTL, CTL_WORDS)?;
+        let mut ctl: [u32; CTL_WORDS] = previous_ctl
+            .try_into()
+            .unwrap_or_else(|_| [0u32; CTL_WORDS]);
+        ctl[C_GEN] = previous.generations;
+        ctl[C_BEST] = std::cmp::min(previous.best, current.best);
+        ctl[C_NVALID] = current.members;
+        ctl[C_EVALS] = previous.evaluated.saturating_add(programs.len() as u32);
+        ctl[C_ARCHIVED] = current.archived;
+        ctl[C_BRED] = previous.bred.saturating_add(CHILDREN as u32);
+        ctl[C_SKIPPED] = previous.skipped;
+        for status in 0..S_COUNT {
+            ctl[C_REJ + status] = ctl[C_REJ + status].saturating_add(reset_ctl[C_REJ + status]);
+        }
+        self.upload_words(Which::State, ST_CTL, &ctl)?;
+        return self.counters();
+    }
+
     /// Breed one generation of children from the current population and return them as bred, before
     /// any evaluation: `None` for a child that was an unchanged parent and is skipped. `how` forces
     /// how children are made (0 as the search does, 1 immigrants only, 2 crossover only, 3 mutation
@@ -1614,6 +1674,28 @@ impl Session {
             out.push(decode_program(&slot));
         }
         return Ok(out);
+    }
+
+    /// Run and select one forced generation, using the same `how` and `mv` codes as
+    /// [`breed_only`](Self::breed_only). Mutation counters are recorded at selection, not breeding.
+    /// Invalid force codes are refused; a crossover with fewer than two members falls back to a
+    /// mutation, and an empty population always produces immigrants.
+    pub fn run_forced_generation(&mut self, how: u32, mv: u32) -> Result<Counters, PayloadError> {
+        if how > 3 || mv > MV_COUNT as u32 {
+            return Err(err(
+                Code::unsupported_field,
+                "invalid forced breeding mode or mutation",
+            ));
+        }
+        let generation = self.next_generation;
+        let n = CHILDREN as u32;
+        self.gpu.submit(|b| {
+            b.dispatch(Stage::Breed, [generation, mv, how, 0, 0], n, 1)?;
+            self.record_evaluation_in(b, generation, n)?;
+            return b.dispatch(Stage::Select, [generation, n, 0, 0, 0], 1, 1);
+        })?;
+        self.next_generation = generation + 1;
+        return self.counters();
     }
 
     /// The programs the population holds, best first, with the raw size each was scored at.
@@ -1851,6 +1933,65 @@ mod tests {
             Ok(g) => g,
             Err(e) => panic!("{}", e.msg),
         };
+    }
+
+    #[test]
+    fn move_statistics_saturate_and_credit_only_the_deterministic_best() {
+        let old = vec![1u8; 64];
+        let new = vec![2u8; 64];
+        let problem = crate::evaluate::Problem::new(
+            &old,
+            &new,
+            64,
+            "A/B",
+            &delta_update_payload::profile::HOST,
+            256,
+        )
+        .unwrap();
+        let config =
+            crate::search::session_config(&problem, &crate::search::SearchConfig::quick()).unwrap();
+        let mut session = Session::open(open_software(), &old, &new, config).unwrap();
+        session.prepare().unwrap();
+        session
+            .gpu
+            .submit(|b| b.dispatch(Stage::InitState, [0; PUSH_WORDS], 1, 1))
+            .unwrap();
+        let mut first = encode_program(&[]).unwrap();
+        first.header[H_FIT] = 50;
+        first.header[H_MOVE] = 1;
+        let mut tied = first.clone();
+        tied.header[H_MOVE] = 2;
+        let mut skipped = SlotImage::skipped();
+        skipped.header[H_MOVE] = 1;
+        session.write_slots(0, &[first, tied, skipped]).unwrap();
+        session
+            .upload_words(Which::State, ST_CTL + C_BEST, &[100])
+            .unwrap();
+        session
+            .upload_words(Which::State, ST_CTL + C_MOVE, &[u32::MAX - 1; MOVE_STATS])
+            .unwrap();
+        session
+            .gpu
+            .submit(|b| b.dispatch(Stage::Select, [0, 3, 0, 0, 0], 1, 1))
+            .unwrap();
+        let stats = session.counters().unwrap().moves;
+        assert_eq!(
+            stats[0],
+            MoveCounters {
+                proposed: u32::MAX,
+                skipped: u32::MAX,
+                admitted: u32::MAX,
+                new_best: u32::MAX,
+            }
+        );
+        assert_eq!(
+            stats[1],
+            MoveCounters {
+                proposed: 1,
+                admitted: 1,
+                ..MoveCounters::default()
+            }
+        );
     }
 
     #[test]
